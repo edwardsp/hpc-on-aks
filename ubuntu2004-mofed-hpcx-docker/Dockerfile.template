@@ -1,5 +1,5 @@
 # Application image
-FROM acrrk344f42c74vy.azurecr.io/ubuntu2004-mofed:latest
+FROM __ACRNAME__.azurecr.io/ubuntu2004-mofed:latest
 
 WORKDIR /root
 
