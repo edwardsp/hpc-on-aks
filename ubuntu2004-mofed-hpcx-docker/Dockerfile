@@ -1,0 +1,119 @@
+# Application image
+FROM acrrk344f42c74vy.azurecr.io/ubuntu2004-mofed:latest
+
+WORKDIR /root
+
+# Download the repository configuration package
+
+RUN curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list > ./microsoft-prod.list && \
+	cp ./microsoft-prod.list /etc/apt/sources.list.d/
+RUN curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg && \
+	cp ./microsoft.gpg /etc/apt/trusted.gpg.d/
+
+RUN apt-get update && DEBIAN_FRONTEND="noninteractive" TZ="Europe/London" \
+        apt-get -o apt::install-recommends=false install -y numactl \
+                   wget \
+		   rpm \
+                   libnuma-dev \
+                   libmpc-dev \
+                   libmpfr-dev \
+                   libxml2-dev \
+                   m4 \
+                   byacc \
+                   python-dev \
+                   python-setuptools \
+                   tcl \
+                   environment-modules \
+                   tk \
+                   texinfo \
+                   libudev-dev \
+                   binutils \
+                   binutils-dev \
+                   selinux-policy-dev \
+                   flex \
+                   libnl-3-dev \
+                   libnl-route-3-dev \
+                   libnl-3-200 \
+                   bison \
+                   libnl-route-3-200 \
+                   gfortran \
+                   cmake \
+                   libnl-3-dev \
+                   libnl-route-3-dev \
+                   net-tools \
+                   libsecret-1-0 \
+		   ansible \
+		   python3-pip \
+                   dkms \
+                   vim			
+
+# Install azcopy tool 
+# To copy blobs or files to or from a storage account.
+RUN wget https://azcopyvnextrelease.blob.core.windows.net/release20210920/azcopy_linux_se_amd64_10.12.2.tar.gz && \
+ tar -xvf azcopy_linux_se_amd64_10.12.2.tar.gz
+
+# Copy the azcopy to the bin path
+RUN cd ./azcopy_linux_se_amd64_10.12.2 && \
+ cp azcopy /usr/bin/ && \
+cd ..
+
+## Install HPC-X
+
+# HPC-X v2.11
+ENV INSTALL_PREFIX /opt
+ENV HPCX_VERSION "v2.11"
+ENV RELEASE_VERSION "20.04"
+ENV TARBALL hpcx-${HPCX_VERSION}-gcc-MLNX_OFED_LINUX-5-ubuntu${RELEASE_VERSION}-cuda11-gdrcopy2-nccl2.11-x86_64.tbz
+ENV HPCX_DOWNLOAD_URL https://azhpcstor.blob.core.windows.net/azhpc-images-store/${TARBALL}
+ENV HPCX_FOLDER hpcx-${HPCX_VERSION}-gcc-MLNX_OFED_LINUX-5-ubuntu${RELEASE_VERSION}-cuda11-gdrcopy2-nccl2.11-x86_64 
+ENV HPCX_PATH {$INSTALL_PREFIX}/${HPCX_FOLDER}
+
+RUN wget --retry-connrefused --tries=3 --waitretry=5 ${HPCX_DOWNLOAD_URL} && \
+	tar -xvf ${TARBALL} && \
+	mv ${HPCX_FOLDER} ${INSTALL_PREFIX}
+ENV HPCX_PATH ${INSTALL_PREFIX}/${HPCX_FOLDER}
+
+# HPC-X module
+# Module Files
+ENV MODULE_FILES_DIRECTORY /usr/share/modules/modulefiles/mpi
+RUN mkdir -p ${MODULE_FILES_DIRECTORY}
+
+RUN echo "#%Module 1.0\n#\n#  HPCx ${HPCX_VERSION}\n#\n\
+conflict   mpi\n\
+module load ${HPCX_PATH}/modulefiles/hpcx" >> ${MODULE_FILES_DIRECTORY}/hpcx-${HPCX_VERSION}
+
+
+# Softlinks
+RUN ln -s ${MODULE_FILES_DIRECTORY}/hpcx-${HPCX_VERSION} ${MODULE_FILES_DIRECTORY}/hpcx
+
+## HPC tuning
+RUN echo '\
+*               hard    memlock         unlimited\n\
+*               soft    memlock         unlimited\n\
+*               hard    nofile          65535\n\
+*               soft    nofile          65535\n\
+*               hard    stack           unlimited\n\
+*               soft    stack           unlimited' >> /etc/security/limits.conf
+
+## Setup user
+ENV USERNAME hpcuser
+ENV HOME /home/${USERNAME}
+ENV SSHDIR ${HOME}/.ssh
+
+RUN ls -al /home
+RUN addgroup ${USERNAME}
+RUN adduser --disabled-password --ingroup ${USERNAME} --home /home/${USERNAME} --gecos "" ${USERNAME}
+RUN echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Passwordless ssh connection between containers.
+RUN mkdir -p ${SSHDIR}
+RUN ssh-keygen -t rsa -N "" -f ${SSHDIR}/id_rsa
+RUN cat ${SSHDIR}/id_rsa.pub >> ${SSHDIR}/authorized_keys && chmod 600 ${SSHDIR}/authorized_keys
+RUN echo "Host *\n\tStrictHostKeyChecking no" >> /home/${USERNAME}/.ssh/config && chmod 600 /home/${USERNAME}/.ssh/config
+
+RUN chown -R ${USERNAME}:${USERNAME} ${SSHDIR}
+
+## ssh server
+RUN mkdir /var/run/sshd
+EXPOSE 22
+CMD ["/usr/sbin/sshd", "-D"]

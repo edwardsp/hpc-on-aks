@@ -127,6 +127,20 @@ Create hierarchy:
     * hpcx
         * OpenFOAM
 
+```
+pushd ubuntu2004-mofed-docker
+docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed .
+docker push ${acr_name}.azurecr.io/ubuntu2004-mofed
+popd
+
+pushd ubuntu2004-mofed-hpcx-docker
+sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
+docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx .
+docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx
+popd
+
+```
+
 ## Launching
 
 * Multiple pods
