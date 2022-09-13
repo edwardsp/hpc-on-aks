@@ -95,25 +95,3 @@ RUN echo '\
 *               hard    stack           unlimited\n\
 *               soft    stack           unlimited' >> /etc/security/limits.conf
 
-## Setup user
-ENV USERNAME hpcuser
-ENV HOME /home/${USERNAME}
-ENV SSHDIR ${HOME}/.ssh
-
-RUN ls -al /home
-RUN addgroup ${USERNAME}
-RUN adduser --disabled-password --ingroup ${USERNAME} --home /home/${USERNAME} --gecos "" ${USERNAME}
-RUN echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-
-# Passwordless ssh connection between containers.
-RUN mkdir -p ${SSHDIR}
-RUN ssh-keygen -t rsa -N "" -f ${SSHDIR}/id_rsa
-RUN cat ${SSHDIR}/id_rsa.pub >> ${SSHDIR}/authorized_keys && chmod 600 ${SSHDIR}/authorized_keys
-RUN echo "Host *\n\tStrictHostKeyChecking no" >> /home/${USERNAME}/.ssh/config && chmod 600 /home/${USERNAME}/.ssh/config
-
-RUN chown -R ${USERNAME}:${USERNAME} ${SSHDIR}
-
-## ssh server
-RUN mkdir /var/run/sshd
-EXPOSE 22
-CMD ["/usr/sbin/sshd", "-D"]
