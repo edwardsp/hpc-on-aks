@@ -139,37 +139,46 @@ docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx
 popd
 
 ```
-#### Testing the MPI container
 
-The container is meant to be used as a bse image for HPC applications containers that make use of the HPC-X MPI 
-
-* Multiple pods
-    * 1 per host
-* TODO: Get IP addresses for hostfile
-* Launch mpirun on one pod
+### OpenFoam v10 container - ubuntu2004-mofed-hpcx-openfoam
 
 ```
-kubectl apply -f testmpi.yaml
+pushd ubuntu2004-mofed-hpcx-openfoam-docker
+sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
+docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam .
+docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam
+popd
+
+```
+## Running some tests
+
+### Testing the MPI layer
+
+In this example we will deploy the OpenFoam container on two pods. Each pod will run on a single host. To run MPI worklouds we will need to optain the IP addesses of the two pods once the yare running. 
+
+* TODO: Get IP addresses for hostfile
+
+```
+kubectl 
+```
+
+We start deployeing the pods:
+
+```
+sed "s/__ACRNAME__/${acr_name}/g" test-openfoam.yaml.template > test-openfoam.yaml
+kubectl apply -f test-openfoam.yaml
 kubectl exec -it mpi-pod1 -- bash
 
 sudo su - hpcuser
-mkdir /home/hpcuser
-cd /home/hpcuser
-ssh-keygen
-
-cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys
-sudo service ssh start
-
-
 ```
-
-hpcx env (should use modules here)
+We load the HPC-Z MPI environemnt module.
 ```
-. /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/hpcx-init-ompi.sh
-hpcx_load
+module load mpi/hpcx
 ```
+Then we run a simple IMB-MPI1 PingPonmg test:
 
 look it works :-)
+
 ```
 hpcuser@mpi-pod1:~$ mpirun -np 2 -host 10.244.3.7:1,10.244.4.7:1 -x LD_LIBRARY_PATH -x UCX_TLS=rc -report-bindings /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 PingPong
 [mpi-pod1:00232] MCW rank 0 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
@@ -240,13 +249,3 @@ hpcuser@mpi-pod1:~$
 ```
 
 
-### OpenFoam v10 container - ubuntu2004-mofed-hpcx-openfoam
-
-```
-pushd ubuntu2004-mofed-hpcx-openfoam-docker
-sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
-docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam .
-docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam
-popd
-
-```
