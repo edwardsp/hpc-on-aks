@@ -267,7 +267,7 @@ hpcuser@mpi-pod1:~$ mpirun -np 2 -npernode 1 -hostfile ~/hostfile -x LD_LIBRARY_
 
 hpcuser@mpi-pod1:~$
 ```
-### run OpenFoam demo
+### Run the OpenFoam demo
 
 We assume that we have already logged into the first pod and have populated the hostfile.
 Let's download the openfoam_demo.sh script to the node:
