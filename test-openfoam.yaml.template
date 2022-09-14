@@ -22,9 +22,9 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: install-user-actions
+  name: install-of-user-actions
 data:  
-  installuseronly: |
+  of_installuseronly: |
     #!/usr/bin/env bash
     set -eo pipefail
     
@@ -49,7 +49,7 @@ data:
       echo "user installation successful"
     fi
     echo "installation completed in $SECONDS seconds"     
-  installuserandhoemdir: |        
+  of_installuserandhoemdir: |        
     #!/usr/bin/env bash
     set -eo pipefail
 
@@ -109,7 +109,7 @@ spec:
       limits:
         mellanox.com/shared_hca_rdma: 1
     command: ["/entrypoint.sh"] 
-    args: ["installuserandhoemdir"] # set this to "downloadandinstall" if you are not using a custom image
+    args: ["of_installuserandhoemdir"] # set this to "downloadandinstall" if you are not using a custom image
     volumeMounts:
     - name: homedir
       mountPath: "/home"
@@ -121,7 +121,7 @@ spec:
       claimName: homedir
   - name: actions
     configMap:
-      name: install-user-actions
+      name: install-of-user-actions
 ---
 apiVersion: v1
 kind: Pod
@@ -141,7 +141,7 @@ spec:
       limits:
         mellanox.com/shared_hca_rdma: 1
     command: ["/entrypoint.sh"]
-    args: ["installuseronly"] # set this to "downloadandinstall" if you are not using a custom image
+    args: ["of_installuseronly"] # set this to "downloadandinstall" if you are not using a custom image
     volumeMounts:
     - name: homedir
       mountPath: "/home"
@@ -153,5 +153,5 @@ spec:
       claimName: homedir
   - name: actions
     configMap:
-      name: install-user-actions
+      name: install-of-user-actions
 ---
