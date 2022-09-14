@@ -113,14 +113,14 @@ kubectl logs <name of installation pod>
 
 Create hierarchy:
 
-* OS Version with Mellanox driver
-    * MPI Distribution
-        * Application
-    
+--------------------------------
+|         OpenFoam v10         | 
+--------------------------------
+|         HPC-X MPI            |
+--------------------------------
+| Ubuntu 20.04 + Mellanox OFED |
+--------------------------------
 
-* Ubuntu 20.04 + Mellanox
-    * hpcx
-        * OpenFOAM
         
 ### Ubuntu 20.04 conatiner with Mellanox OFED - ubuntu2004-mofed
 ```
@@ -130,7 +130,7 @@ docker push ${acr_name}.azurecr.io/ubuntu2004-mofed
 popd
 ```
 
-### HPCX MPI layer on top of the previous container image. - ubuntu2004-mofed-hpcx
+### HPCX MPI layer on top of the previous container image - ubuntu2004-mofed-hpcx
 ```
 pushd ubuntu2004-mofed-hpcx-docker
 sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
@@ -139,10 +139,9 @@ docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx
 popd
 
 ```
+#### Testing the MPI container
 
-
-
-## Launching
+The container is meant to be used as a bse image for HPC applications containers that make use of the HPC-X MPI 
 
 * Multiple pods
     * 1 per host
@@ -241,7 +240,7 @@ hpcuser@mpi-pod1:~$
 ```
 
 
-### OpenFoam v10 container. - ubuntu2004-mofed-hpcx-openfoam
+### OpenFoam v10 container - ubuntu2004-mofed-hpcx-openfoam
 
 ```
 pushd ubuntu2004-mofed-hpcx-openfoam-docker
