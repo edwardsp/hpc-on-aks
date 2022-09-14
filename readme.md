@@ -284,17 +284,13 @@ openfoam_demo.sh              100%[=============================================
 Then make it executable and run the script:
 ```
 chmod u+x ./openfoam_demos.sh
-./o:penfoam_demos.sh
+./openfoam_demos.sh
 ```
 You can track the progress using:
 ```
 tail -f ./motorbike_scaled/of_output.txt
+
+Running surfaceFeatures on /home/hpcuser/motorbike_scaled
+Running blockMesh on /home/hpcuser/motorbike_scaled
+Running decomposePar on /home/hpcuser/motorbike_scaled
 ```
-
-
-
-
-
-
-
-
