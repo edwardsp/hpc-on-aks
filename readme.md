@@ -179,10 +179,17 @@ of-mpi-pod1   10.244.2.7
 of-mpi-pod2   10.244.3.6
 ```
 Now we can connect to the first pod and switch to the hpcuser:
-
 ```
 kubectl exec -it mpi-pod1 -- bash
 sudo su - hpcuser
+```
+To simplify launching mpi worklouds we can store the IP addresses in a hostfile.
+
+```
+cat ~/hostfile
+
+10.244.2.7
+10.244.3.6
 ```
 We load the HPC-X MPI environemnt module.
 ```
@@ -193,7 +200,7 @@ Then we run a simple IMB-MPI1 PingPong test:
 look it works :-)
 
 ```
-hpcuser@mpi-pod1:~$ mpirun -np 2 -host 10.244.3.7:1,10.244.4.7:1 -x LD_LIBRARY_PATH -x UCX_TLS=rc -report-bindings /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 PingPong
+hpcuser@mpi-pod1:~$ mpirun -np 2 -npernode 1 -hostfile ~/hostfile -x LD_LIBRARY_PATH -x UCX_TLS=rc -report-bindings /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 PingPong 
 [mpi-pod1:00232] MCW rank 0 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
 [mpi-pod2:00170] MCW rank 1 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
 #------------------------------------------------------------
