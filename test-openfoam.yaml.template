@@ -109,7 +109,7 @@ spec:
       limits:
         mellanox.com/shared_hca_rdma: 1
     command: ["/entrypoint.sh"] 
-    args: ["of_installuserandhoemdir"] # set this to "downloadandinstall" if you are not using a custom image
+    args: ["of_installuserandhoemdir"] # Adds the user to the pod, configures the ssh keys and adds the OpeanFoam initialization script to .bashrc
     volumeMounts:
     - name: homedir
       mountPath: "/home"
@@ -141,7 +141,7 @@ spec:
       limits:
         mellanox.com/shared_hca_rdma: 1
     command: ["/entrypoint.sh"]
-    args: ["of_installuseronly"] # set this to "downloadandinstall" if you are not using a custom image
+    args: ["of_installuseronly"] # Only add the user to the pod
     volumeMounts:
     - name: homedir
       mountPath: "/home"
