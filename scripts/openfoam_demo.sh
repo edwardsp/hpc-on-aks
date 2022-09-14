@@ -9,8 +9,6 @@ source /opt/openfoam10/etc/bashrc
 CASE_NAME=motorbike_scaled
 CORES=240
 PPN=120
-NODE1=10.244.3.4
-NODE2=10.244.2.4
 
 cp -r $WM_PROJECT_DIR/tutorials/incompressible/simpleFoam/motorBike $CASE_NAME
 cd $CASE_NAME
