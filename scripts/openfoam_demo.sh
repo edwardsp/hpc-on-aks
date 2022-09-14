@@ -38,7 +38,7 @@ sed -i "s/numberOfSubdomains  6;/numberOfSubdomains $CORES;/g" system/decomposeP
 sed -i "s/(3 2 1);/(${X} ${Y} ${Z});/g" system/decomposeParDict
 
 # update runParallel to add MPI flagsM_EXT_LIBIN
-sed -i "s/runParallel\( *\([^ ]*\).*\)$/mpirun -np $CORES -host $NODE1:$PPN,$NODE2:$PPN -x LD_LIBRARY_PATH -x UCX_TLS=rc
+sed -i "s/runParallel\( *\([^ ]*\).*\)$/mpirun -np $CORES -npernode $PPN -hostfile ~/hostfile -x LD_LIBRARY_PATH -x UCX_TLS=rc
  -x PATH $(env |grep FOAM | cut -d'=' -f1 | sed 's/^/-x /g' | tr '\n' ' ') $(env |grep WM | cut -d'=' -f1 | sed 's/^/-x
 /g' | tr '\n' ' ')-x MPI_BUFFER_SIZE \1 -parallel 2\>\&1 |tee log\.\2/g" Allrun
 
