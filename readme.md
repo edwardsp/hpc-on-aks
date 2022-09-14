@@ -113,6 +113,7 @@ kubectl logs <name of installation pod>
 
 Create hierarchy:
 
+```
 --------------------------------
 |         OpenFoam v10         | 
 --------------------------------
@@ -120,8 +121,7 @@ Create hierarchy:
 --------------------------------
 | Ubuntu 20.04 + Mellanox OFED |
 --------------------------------
-
-        
+```        
 ### Ubuntu 20.04 conatiner with Mellanox OFED - ubuntu2004-mofed
 ```
 pushd ubuntu2004-mofed-docker
