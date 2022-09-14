@@ -109,11 +109,6 @@ To check the installation:
 kubectl get pods
 kubectl logs <name of installation pod>
 ```
-
-
-
-
-
 ## Containers
 
 Create hierarchy:
@@ -126,13 +121,17 @@ Create hierarchy:
 * Ubuntu 20.04 + Mellanox
     * hpcx
         * OpenFOAM
-
+        
+### Ubuntu 20.04 conatiner with Mellanox OFED - ubuntu2004-mofed
 ```
 pushd ubuntu2004-mofed-docker
 docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed .
 docker push ${acr_name}.azurecr.io/ubuntu2004-mofed
 popd
+```
 
+### HPCX MPI layer on top of the previous container image. - ubuntu2004-mofed-hpcx
+```
 pushd ubuntu2004-mofed-hpcx-docker
 sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
 docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx .
@@ -140,6 +139,8 @@ docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx
 popd
 
 ```
+
+
 
 ## Launching
 
@@ -237,4 +238,16 @@ hpcuser@mpi-pod1:~$ mpirun -np 2 -host 10.244.3.7:1,10.244.4.7:1 -x LD_LIBRARY_P
 # All processes entering MPI_Finalize
 
 hpcuser@mpi-pod1:~$
+```
+
+
+### OpenFoam v10 container. - ubuntu2004-mofed-hpcx-openfoam
+
+```
+pushd ubuntu2004-mofed-hpcx-openfoam-docker
+sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
+docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam .
+docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam
+popd
+
 ```
