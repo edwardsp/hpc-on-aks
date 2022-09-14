@@ -161,21 +161,34 @@ In this example we will deploy the OpenFoam container on two pods. Each pod will
 ```
 kubectl 
 ```
-
 We start deployeing the pods:
-
 ```
 sed "s/__ACRNAME__/${acr_name}/g" test-openfoam.yaml.template > test-openfoam.yaml
 kubectl apply -f test-openfoam.yaml
-kubectl exec -it mpi-pod1 -- bash
+```
+We can check the status of the pods:
 
+```
+kubectl get pods 
+```
+After the pods are up we can chekc for the internal IP address:
+```
+kubectl get pods of-mpi-pod1 of-mpi-pod2 -o custom-columns=NAME:.metadata.name,PodIP:status.podIP
+NAME          PodIP
+of-mpi-pod1   10.244.2.7
+of-mpi-pod2   10.244.3.6
+```
+Now we can connect to the first pod and switch to the hpcuser:
+
+```
+kubectl exec -it mpi-pod1 -- bash
 sudo su - hpcuser
 ```
-We load the HPC-Z MPI environemnt module.
+We load the HPC-X MPI environemnt module.
 ```
 module load mpi/hpcx
 ```
-Then we run a simple IMB-MPI1 PingPonmg test:
+Then we run a simple IMB-MPI1 PingPong test:
 
 look it works :-)
 
