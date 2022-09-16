@@ -80,6 +80,8 @@ data:
       sudo -u ${USERNAME} /bin/bash -c "ssh-keygen -q -f /home/${USERNAME}/.ssh/id_rsa -N '' "
       sudo -u ${USERNAME} /bin/bash -c 'echo -e "Host *\n\tStrictHostKeyChecking no" >> ~/.ssh/config && chmod 600 ~/.ssh/config'
       sudo -u ${USERNAME} /bin/bash -c 'cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys'    
+    else
+      echo "SSH keys are alredy configured -- skipping configuration"
     fi
 
     if [ $? -ne 0 ];
