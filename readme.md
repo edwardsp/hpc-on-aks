@@ -152,6 +152,144 @@ popd
 ```
 ## Running some tests
 
+### Testing the IB with IMB-MPI1 PingPong
+
+The example `pingpong-mpi-job.yaml.template` is an example running the IMB-MPI1 PingPong test.  It is parameterized on ACR name and the number of nodes to use.  Create the YAML as follows:
+
+```
+sed "s/__ACRNAME__/${acr_name}/g;s/__NNODES__/2/g" pingpong-mpi-job.yaml.template > pingpong-mpi-job.yaml
+```
+
+This example uses an `indexed-job` to run the MPI test.  All the initialization and start-up is embedded in the command.  The pods will all terminate once the job is complete although the storage remains.  The `index` is used to find the first pod and this will create the home directory, ssh keys, hostfile and launch `mpirun`.  Here is an overview of steps:
+
+* Start SSH daemon
+* Touch file `/home/hosts/<IP-ADDRESS>`
+* Add user and group
+* If index == 0:
+  - Create home directory
+  - Create SSH key and set SSH config and authorized_keys
+  - Wait for all hosts to start by checking the number of files in /home/hosts
+  - Create a hostfile from the filenames in /home/hosts
+  - Launch `mpirun` command
+  - Get exit status and create file `/home/complete` with either success or failure
+* Else index > 0:
+  - Wait for file `/home/complete` to be created
+* Exit pod
+
+Deploy with:
+
+```
+kubectl apply -f pingpong-mpi-job.yaml
+```
+
+The mpirun output will be in the first pod.  You can find this with:
+
+```
+kubectl get pods
+```
+
+And, then look at the `indexed-job-0-XXXXX`:
+
+```
+kubectl logs indexed-job-0-XXXXX
+```
+
+This is example output:
+
+```
+[      0 ] Starting SSH daemon
+ * Starting OpenBSD Secure Shell server sshd
+   ...done.
+[      0 ] Creating IP file (/home/hosts/10.244.28.5)
+[      0 ] Adding user with homedir (hpcuser)
+Adding group `hpcuser' (GID 1000) ...
+Done.
+Adding user `hpcuser' ...
+Adding new user `hpcuser' (1000) with group `hpcuser' ...
+Creating home directory `/home/hpcuser' ...
+Copying files from `/etc/skel' ...
+[      0 ] User added ()
+[      0 ] Creating ssh key
+[      1 ] Waiting for hosts
+[      1 ] - hosts available: 1 out of 2
+[     11 ] - hosts available: 1 out of 2
+[     21 ] Creating hostfile
+[     21 ] Hostfile contents:
+10.244.28.5
+10.244.29.5
+[     21 ] Launching MPI
+Loading mpi/hpcx
+  Loading requirement:
+    /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/modulefiles/hpcx
+Warning: Permanently added '10.244.29.5' (ECDSA) to the list of known hosts.
+[indexed-job-0:00092] MCW rank 0 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+[indexed-job-1:00062] MCW rank 1 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
+#------------------------------------------------------------
+#    Intel (R) MPI Benchmarks 2018, MPI-1 part
+#------------------------------------------------------------
+# Date                  : Fri Sep 16 15:20:51 2022
+# Machine               : x86_64
+# System                : Linux
+# Release               : 5.4.0-1089-azure
+# Version               : #94~18.04.1-Ubuntu SMP Fri Aug 5 12:34:50 UTC 2022
+# MPI Version           : 3.1
+# MPI Thread Environment:
+
+
+# Calling sequence was:
+
+# /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 PingPong  
+
+# Minimum message length in bytes:   0
+# Maximum message length in bytes:   4194304
+#
+# MPI_Datatype                   :   MPI_BYTE
+# MPI_Datatype for reductions    :   MPI_FLOAT
+# MPI_Op                         :   MPI_SUM
+#
+#
+
+# List of Benchmarks to run:
+
+# PingPong
+
+#---------------------------------------------------
+# Benchmarking PingPong
+# #processes = 2
+#---------------------------------------------------
+       #bytes #repetitions      t[usec]   Mbytes/sec
+            0         1000         1.79         0.00
+            1         1000         1.78         0.56
+            2         1000         1.78         1.13
+            4         1000         1.79         2.24
+            8         1000         1.78         4.49
+           16         1000         1.79         8.96
+           32         1000         1.93        16.62
+           64         1000         2.07        30.97
+          128         1000         2.08        61.43
+          256         1000         2.66        96.08
+          512         1000         2.82       181.39
+         1024         1000         2.91       351.81
+         2048         1000         3.13       654.76
+         4096         1000         3.71      1103.37
+         8192         1000         4.31      1900.06
+        16384         1000         5.60      2923.27
+        32768         1000         7.75      4230.65
+        65536          640        10.91      6004.71
+       131072          320        17.11      7662.75
+       262144          160        19.86     13202.82
+       524288           80        32.01     16380.15
+      1048576           40        55.18     19003.71
+      2097152           20       103.34     20293.98
+      4194304           10       198.12     21170.38
+
+
+# All processes entering MPI_Finalize
+
+[     22 ] Writing completion file (/home/complete)
+[     22 ] Exiting, status: success)
+```
+
 ### Testing the MPI layer
 
 In this example we will deploy the OpenFoam container on two pods. Each pod will run on a single host. To run MPI worklouds we will need to optain the IP addesses of the two pods once the yare running. 
