@@ -72,8 +72,10 @@ az aks get-credentials --overwrite-existing --resource-group $resource_group --n
 These steps require the ACR name.  This is in the output from the deployment:
 
 ```
-acr_name=$(jq -r .properties.outputs.acrName.value deploy-output.json)
+export acr_name=$(jq -r .properties.outputs.acrName.value deploy-output.json)
 ```
+
+Note: `acr_name` is exported so that it can be used by `render_template.py` later.
 
 Log in to the ACR using the Azure CLI:
 

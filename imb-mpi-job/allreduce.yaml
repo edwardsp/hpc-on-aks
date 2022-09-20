@@ -1,0 +1,7 @@
+---
+name: allreduce
+storage:
+  size: 100Gi
+mpirun:
+  nnodes: 2
+  ppn: 120

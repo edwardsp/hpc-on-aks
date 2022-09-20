@@ -1,0 +1,121 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: azurefile-csi-nfs
+provisioner: file.csi.azure.com
+parameters:
+  protocol: nfs
+  skuName: Premium_LRS
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ name }}-homedir-{{ timestamp }}
+spec:
+  accessModes:
+  - ReadWriteMany
+  storageClassName: azurefile-csi-nfs
+  resources:
+    requests:
+      storage: {{ storage.size or '100Gi' }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ name }}-indexed-job-{{ timestamp }}
+spec:
+  completions: {{ mpirun.nnodes }}
+  parallelism: {{ mpirun.nnodes }}
+  completionMode: Indexed
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: worker
+        image: {{ env['acr_name'] }}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam:latest
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK"]
+          privileged: true
+        resources:
+          requests:
+            mellanox.com/shared_hca_rdma: 1
+          limits:
+            mellanox.com/shared_hca_rdma: 1
+        command:
+        - "bash"
+        - "-c"
+        - |
+          SECONDS=0
+          USERNAME=hpcuser
+          
+          printf "[ %6d ] Starting SSH daemon\n" $SECONDS
+          /etc/init.d/ssh start
+          
+          printf "[ %6d ] Creating IP file (/home/hosts/${POD_IP})\n" $SECONDS
+          mkdir -p /home/hosts
+          touch /home/hosts/${POD_IP}
+
+          if [ "${JOB_COMPLETION_INDEX}" = "0" ]; then
+            printf "[ %6d ] Adding user with homedir (${USERNAME})\n" $SECONDS
+            addgroup ${USERNAME}
+            adduser --disabled-password --ingroup ${USERNAME} --home /home/${USERNAME} --gecos "" ${USERNAME}
+            printf "[ %6d ] User added ($(getent passwd ${USERNAME} > /dev/null))\n" $SECONDS
+
+            printf "[ %6d ] Creating ssh key\n" $SECONDS
+            cat <<EOF | sudo -u ${USERNAME} bash
+          ssh-keygen -q -f /home/${USERNAME}/.ssh/id_rsa -N ''
+          echo -e "Host *\n\tStrictHostKeyChecking no" >> /home/${USERNAME}/.ssh/config
+          chmod 600 /home/${USERNAME}/.ssh/config
+          cp /home/${USERNAME}/.ssh/id_rsa.pub /home/${USERNAME}/.ssh/authorized_keys
+          EOF
+
+            printf "[ %6d ] Waiting for hosts\n" $SECONDS
+            while [ "$(ls /home/hosts | wc -l)" != "{{ mpirun.nnodes }}" ]; do
+              printf "[ %6d ] - hosts available: $(ls /home/hosts | wc -l) out of {{ mpirun.nnodes }}\n" $SECONDS
+              sleep 10
+            done
+
+            printf "[ %6d ] Creating hostfile\n" $SECONDS
+            ls /home/hosts > /home/hostfile
+            printf "[ %6d ] Hostfile contents:\n" $SECONDS
+            cat /home/hostfile
+            chmod +r /home/hostfile
+            
+            printf "[ %6d ] Launching MPI\n" $SECONDS
+            cat <<EOF | su - ${USERNAME}
+          module load mpi/hpcx
+          mpirun -mca coll_hcol_enable 1 -np {{ mpirun.nnodes * mpirun.ppn }} -npernode {{ mpirun.ppn }} -hostfile /home/hostfile -x LD_LIBRARY_PATH -x UCX_TLS=rc -report-bindings /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 Allreduce -npmin {{ mpirun.nnodes * mpirun.ppn }}
+          EOF
+            RESULT=$?
+
+            printf "[ %6d ] Writing completion file (/home/complete)\n" $SECONDS
+            if [ "$RESULT" = "0" ]; then
+              echo "success" > /home/complete
+            else
+              echo "failure ($RESULT)" > /home/complete
+            fi
+          else
+            printf "[ %6d ] Adding user (${USERNAME})\n" $SECONDS
+            addgroup ${USERNAME}
+            adduser --disabled-password --ingroup ${USERNAME} --no-create-home --gecos "" ${USERNAME}
+            printf "[ %6d ] User added ($(getent passwd $user > /dev/null))\n" $SECONDS
+
+            printf "[ %6d ] Waiting for job completion (/home/complete)\n" $SECONDS
+            while [ ! -f /home/complete ]; do
+              sleep 10
+            done
+          fi
+          printf "[ %6d ] Exiting, status: $(</home/complete))\n" $SECONDS
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: {{ name }}-homedir-{{ timestamp }}
+          mountPath: "/home"
+      volumes:
+      - name: {{ name }}-homedir-{{ timestamp }}
+        persistentVolumeClaim:
+          claimName: {{ name }}-homedir-{{ timestamp }}
