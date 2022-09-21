@@ -435,3 +435,13 @@ Running blockMesh on /home/hpcuser/motorbike_scaled
 Running decomposePar on /home/hpcuser/motorbike_scaled
 ...
 ```
+
+
+# Notes
+
+Get k8s resources:
+```
+kubectl api-resources
+```
+> Useful to find a new type, e.g. volcano job
+
