@@ -1,5 +1,10 @@
 ---
 name: allreduce
+runas:
+  user: hpcuser
+  userid: 1000
+  group: hpcuser
+  groupid: 1000
 storage:
   size: 100Gi
 mpirun:
