@@ -16,13 +16,3 @@ RUN sh -c "wget -O - https://dl.openfoam.org/gpg.key > /etc/apt/trusted.gpg.d/op
 RUN add-apt-repository http://dl.openfoam.org/ubuntu
 RUN sudo apt-get update; sudo apt-get -y install openfoam10
 
-
-## ssh server
-RUN mkdir /var/run/sshd
-EXPOSE 22
-
-COPY entrypoint.sh /entrypoint.sh 
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
-

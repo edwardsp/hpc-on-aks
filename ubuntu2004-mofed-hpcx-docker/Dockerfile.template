@@ -47,16 +47,6 @@ RUN apt-get update && DEBIAN_FRONTEND="noninteractive" TZ="Europe/London" \
                    dkms \
                    vim			
 
-# Install azcopy tool 
-# To copy blobs or files to or from a storage account.
-RUN wget https://azcopyvnextrelease.blob.core.windows.net/release20210920/azcopy_linux_se_amd64_10.12.2.tar.gz && \
- tar -xvf azcopy_linux_se_amd64_10.12.2.tar.gz
-
-# Copy the azcopy to the bin path
-RUN cd ./azcopy_linux_se_amd64_10.12.2 && \
- cp azcopy /usr/bin/ && \
-cd ..
-
 ## Install HPC-X
 
 # HPC-X v2.11
@@ -85,13 +75,3 @@ module load ${HPCX_PATH}/modulefiles/hpcx" >> ${MODULE_FILES_DIRECTORY}/hpcx-${H
 
 # Softlinks
 RUN ln -s ${MODULE_FILES_DIRECTORY}/hpcx-${HPCX_VERSION} ${MODULE_FILES_DIRECTORY}/hpcx
-
-## HPC tuning
-RUN echo '\
-*               hard    memlock         unlimited\n\
-*               soft    memlock         unlimited\n\
-*               hard    nofile          65535\n\
-*               soft    nofile          65535\n\
-*               hard    stack           unlimited\n\
-*               soft    stack           unlimited' >> /etc/security/limits.conf
-

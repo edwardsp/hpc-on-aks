@@ -14,3 +14,17 @@ RUN curl -L https://content.mellanox.com/ofed/MLNX_OFED-${MOFED_VER}/MLNX_OFED_L
         MLNX_OFED_LINUX-${MOFED_VER}-${OS_VER}-${PLATFORM}/mlnxofedinstall --user-space-only --without-fw-update --all --force
 RUN rm MLNX_OFED.tgz
 RUN rm -rf /tmp/MLNX_OFED_LINUX-${MOFED_VER}-${OS_VER}-${PLATFORM}
+
+## HPC tuning
+RUN echo '\
+*               hard    memlock         unlimited\n\
+*               soft    memlock         unlimited\n\
+*               hard    nofile          65535\n\
+*               soft    nofile          65535\n\
+*               hard    stack           unlimited\n\
+*               soft    stack           unlimited' >> /etc/security/limits.conf
+
+## install azcopy
+RUN cd /usr/bin && \
+        wget -q https://aka.ms/downloadazcopy-v10-linux -O - | tar zxf - --strip-components 1 --wildcards '*/azcopy' && \
+        chmod 755 /usr/bin/azcopy
