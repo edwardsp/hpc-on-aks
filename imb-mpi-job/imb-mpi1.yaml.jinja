@@ -32,7 +32,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: worker
-        image: {{ env['acr_name'] }}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam:latest
+        image: {{ env['acr_name'] }}.azurecr.io/ubuntu2004-mofed-hpcx:latest
         securityContext:
           capabilities:
             add: ["IPC_LOCK"]
