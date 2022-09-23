@@ -19,145 +19,122 @@ spec:
     requests:
       storage: 100Gi
 ---
-apiVersion: v1
-kind: ConfigMap
+apiVersion: batch/v1
+kind: Job
 metadata:
-  name: install-of-user-actions
-data:  
-  of_installuseronly: |
-    #!/usr/bin/env bash
-    set -eo pipefail
-    
-    # This script should be executed on VM host in the directly as the deb 
-    # will install systemd units and host dependencies.
-    
-    SECONDS=0
-    
-    umount /mnt || true
-    
-    USERNAME=hpcuser
-    addgroup ${USERNAME}
-    adduser --disabled-password --ingroup ${USERNAME} --no-create-home --gecos "" ${USERNAME} 
-    
-    getent passwd $user  > /dev/null
-
-    if [ $? -ne 0 ];
-    then
-      echo "user installation failed"
-      exit 1
-    else
-      echo "user installation successful"
-    fi
-    echo "installation completed in $SECONDS seconds"     
-  
-  of_installuserandhomedir: |        
-    #!/usr/bin/env bash
-    set -eo pipefail
-
-    # This script should be executed on VM host in the directly as the deb
-    # will install systemd units and host dependencies.
-
-    SECONDS=0
-
-    umount /mnt || true
-
-    USERNAME=hpcuser
-    addgroup ${USERNAME}
-    adduser --disabled-password --ingroup ${USERNAME} --home /home/${USERNAME} --gecos "" ${USERNAME}
-
-    getent passwd ${USERNAME}  > /dev/null
-
-    if [ $? -ne 0 ];
-    then
-      echo "user installation failed"
-      exit 1
-    else
-      echo "user creation successful"
-    fi 
-
-    if [[ ! -d /home/${USERNAME}/.ssh ]];
-    then 
-      sudo -u ${USERNAME} /bin/bash -c "ssh-keygen -q -f /home/${USERNAME}/.ssh/id_rsa -N '' "
-      sudo -u ${USERNAME} /bin/bash -c 'echo -e "Host *\n\tStrictHostKeyChecking no" >> ~/.ssh/config && chmod 600 ~/.ssh/config'
-      sudo -u ${USERNAME} /bin/bash -c 'cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys'    
-    else
-      echo "SSH keys are alredy configured -- skipping configuration"
-    fi
-
-    if [ $? -ne 0 ];
-    then
-      echo "shh key configuration failed"
-      exit 1
-    else
-      echo "shh key configuration successful"
-    fi 
-
-    echo "Adding source /opt/openfoam10/etc/bashrc to the users .bashrc"
-    sudo -u ${USERNAME} /bin/bash -c 'echo -e "\n . /opt/openfoam10/etc/bashrc" >> ~/.bashrc' 
-
-    echo "installation completed in $SECONDS seconds"
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: of-mpi-pod1
+  name: 'indexed-job'
 spec:
-  containers:
-  - name: openfoam-test
-    image: __ACRNAME__.azurecr.io/ubuntu2004-mofed-hpcx-openfoam:latest
-    securityContext:
-      capabilities:
-        add: ["IPC_LOCK"]
-      privileged: true
-    resources:
-      requests:
-        mellanox.com/shared_hca_rdma: 1
-      limits:
-        mellanox.com/shared_hca_rdma: 1
-    command: ["/entrypoint.sh"] 
-    args: ["of_installuserandhomedir"] # Adds the user to the pod, configures the ssh keys and adds the OpeanFoam initialization script to .bashrc
-    volumeMounts:
-    - name: homedir
-      mountPath: "/home"
-    - name: actions
-      mountPath: "/opt/actions"
-  volumes:
-  - name: homedir
-    persistentVolumeClaim:
-      claimName: homedir
-  - name: actions
-    configMap:
-      name: install-of-user-actions
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: of-mpi-pod2
-spec:
-  containers:
-  - name: openfoam-test
-    image: __ACRNAME__.azurecr.io/ubuntu2004-mofed-hpcx-openfoam:latest
-    securityContext:
-      capabilities:
-        add: ["IPC_LOCK"]
-      privileged: true
-    resources:
-      requests:
-        mellanox.com/shared_hca_rdma: 1
-      limits:
-        mellanox.com/shared_hca_rdma: 1
-    command: ["/entrypoint.sh"]
-    args: ["of_installuseronly"] # Only add the user to the pod
-    volumeMounts:
-    - name: homedir
-      mountPath: "/home"
-    - name: actions
-      mountPath: "/opt/actions"
-  volumes:
-  - name: homedir
-    persistentVolumeClaim:
-      claimName: homedir
-  - name: actions
-    configMap:
-      name: install-of-user-actions
+  completions: __NNODES__
+  parallelism: __NNODES__
+  completionMode: Indexed
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: worker
+        image: __ACRNAME__.azurecr.io/ubuntu2004-mofed-hpcx-openfoam:latest
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK"]
+          privileged: true
+        resources:
+          requests:
+            mellanox.com/shared_hca_rdma: 1
+          limits:
+            mellanox.com/shared_hca_rdma: 1
+        command:
+        - "bash"
+        - "-c"
+        - |
+          SECONDS=0
+          USERNAME=hpcuser
+          PPN=__PPNODE__
+          NHOSTS=__NNODES__
+          CORES=__NCORES__
+
+          printf "[ %6d ] Starting SSH daemon\n" $SECONDS
+          /etc/init.d/ssh start
+          
+          printf "[ %6d ] Creating IP file (/home/hosts/${POD_IP})\n" $SECONDS
+          mkdir -p /home/hosts
+          touch /home/hosts/${POD_IP}
+
+          if [ "${JOB_COMPLETION_INDEX}" = "0" ]; then
+            printf "[ %6d ] Adding user with homedir (${USERNAME})\n" $SECONDS
+            addgroup ${USERNAME}
+            adduser --disabled-password --ingroup ${USERNAME} --home /home/${USERNAME} --gecos "" ${USERNAME}
+            printf "[ %6d ] User added ($(getent passwd ${USERNAME} > /dev/null))\n" $SECONDS
+
+            if [[! -f /home/${USERNAME}/.ssh]]; then
+              printf "[ %6d ] Creating ssh key\n" $SECONDS
+              cat <<EOF | sudo -u ${USERNAME} bash
+          ssh-keygen -q -f /home/${USERNAME}/.ssh/id_rsa -N ''
+          echo -e "Host *\n\tStrictHostKeyChecking no" >> /home/${USERNAME}/.ssh/config
+          chmod 600 /home/${USERNAME}/.ssh/config
+          cp /home/${USERNAME}/.ssh/id_rsa.pub /home/${USERNAME}/.ssh/authorized_keys
+          echo -e "\n . /opt/openfoam10/etc/bashrc" >> ~/.bashrc
+          EOF
+            fi
+
+            printf "[ %6d ] Waiting for hosts\n" $SECONDS
+            while [ "$(ls /home/hosts | wc -l)" != "${NHOSTS}" ]; do
+              printf "[ %6d ] - hosts available: $(ls /home/hosts | wc -l) out of ${NHOSTS}\n" $SECONDS
+              sleep 10
+            done
+
+            printf "[ %6d ] Creating hostfile\n" $SECONDS
+            ls /home/hosts > /home/hostfile
+            printf "[ %6d ] Hostfile contents:\n" $SECONDS
+            cat /home/hostfile
+            chmod +r /home/hostfile
+            
+            printf "[ %6d ] Launching MPI\n" $SECONDS
+            cat <<EOF | su - ${USERNAME}
+          module load mpi/hpcx
+          mount
+          wget https://raw.githubusercontent.com/edwardsp/hpc-on-aks/main/scripts/openfoam_demo.sh
+          chmod u+x ./openfoam_demos.sh
+          ./openfoam_demos.sh
+          EOF
+            RESULT=$?
+
+            printf "[ %6d ] Writing completion file (/home/complete)\n" $SECONDS
+            if [ "$RESULT" = "0" ]; then
+              echo "success" > /home/complete
+            else
+              echo "failure ($RESULT)" > /home/complete
+            fi
+          else
+            printf "[ %6d ] Adding user (${USERNAME})\n" $SECONDS
+            addgroup ${USERNAME}
+            adduser --disabled-password --ingroup ${USERNAME} --no-create-home --gecos "" ${USERNAME}
+            printf "[ %6d ] User added ($(getent passwd $user > /dev/null))\n" $SECONDS
+
+            printf "[ %6d ] Waiting for job completion (/home/complete)\n" $SECONDS
+            while [ ! -f /home/complete ]; do
+              sleep 10
+            done
+          fi
+          printf "[ %6d ] Exiting, status: $(</home/complete))\n" $SECONDS
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: DBENCH_MOUNTPOINT
+            value: /scratch
+        - name: FIO_SIZE
+            value: 1G
+      volumeMounts:
+      - name: homedir
+        mountPath: /home
+      - name: dbench-pv
+        mountPath: /scratch         
+      volumes:
+      - name: homedir
+        persistentVolumeClaim:
+          claimName: homedir
+      - name: dbench-pv
+        persistentVolumeClaim:
+          claimName: dbench
 ---
