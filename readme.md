@@ -509,47 +509,9 @@ End
 
 Finalising parallel run
 Running reconstructParMesh on /home/hpcuser/motorbike_scaled
-<pre>
-```
+</pre>
+
 To cleanup the job, just run the helm unistall command:
 ```
 helm uninstall openfoam-job
 ```
-
-
-We assume that we have already logged into the first pod and have populated the hostfile.
-Let's download the openfoam_demo.sh script to the node:
-```
-wget https://raw.githubusercontent.com/edwardsp/hpc-on-aks/main/scripts/openfoam_demo.sh
-
-Saving to: 'openfoam_demo.sh'
-
-openfoam_demo.sh              100%[=================================================>]   1.24K  --.-KB/s    in 0s
-
-2022-09-14 10:22:23 (47.9 MB/s) - 'openfoam_demo.sh' saved [1271/1271]
-```
-
-Then make it executable and run the script:
-```
-chmod u+x ./openfoam_demos.sh
-./openfoam_demos.sh
-```
-You can track the progress using:
-```
-tail -f ./motorbike_scaled/of_output.txt
-
-Running surfaceFeatures on /home/hpcuser/motorbike_scaled
-Running blockMesh on /home/hpcuser/motorbike_scaled
-Running decomposePar on /home/hpcuser/motorbike_scaled
-...
-```
-
-
-# Notes
-
-Get k8s resources:
-```
-kubectl api-resources
-```
-> Useful to find a new type, e.g. volcano job
-
