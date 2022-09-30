@@ -449,11 +449,14 @@ To apply the changes to the nodepool hb120v2, we need to run the folowing comman
 ```
 az aks nodepool update -g ${resource_group} --cluster-name ${acr_name} -n hb120v2 --labels aks-local-ssd=true
 ```
-
-
 ## Run the OpenFoam Helm demo
 
-We assume 
+We assume that the the previous demos have been run. If not, please add the storageclass by running:
+```
+kubectl apply -f azurefile-csi-nfs-storageclass.yaml
+```
+To run the OpenFoam demo, please make sure you have installed helm version 3 on your device.
+
 
 
 
