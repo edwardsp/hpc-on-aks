@@ -489,8 +489,8 @@ install-mlx-driver-c8wz4   1/1     Running   0          4h45m
 install-mlx-driver-zkxpd   1/1     Running   0          4h45m
 openfoam-job-0-rqznw       1/1     Running   0          5m17s
 openfoam-job-1-qlblr       1/1     Running   0          5m17s
-
-
+```
+```
 kubectl logs openfoam-job-0-rqznw
 
 streamlines streamlines write:
