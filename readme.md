@@ -113,18 +113,18 @@ kubectl logs <name of installation pod>
 ```
 ## Containers
 
-Create hierarchy:
+The containers have created based on the scripting from [azhpc-images](https://github.com/Azure/azhpc-images) GitHub repo.  However, it has been separated into the following hierarchy:
+* __Base container__: Contains the OS, Mellanox OFED driver and general tools.
+* __MPI container__: Adding an MPI version to the base container.
+* __Application container__: New container created for each application. 
 
-```
---------------------------------
-|         OpenFoam v10         | 
---------------------------------
-|         HPC-X MPI            |
---------------------------------
-| Ubuntu 20.04 + Mellanox OFED |
---------------------------------
-```        
-### Ubuntu 20.04 conatiner with Mellanox OFED - ubuntu2004-mofed
+The Azure images for VMs contain all the different MPIs doing this significantly increases the size which is particularly noticeable for containers.
+
+![Container Hierarchy](images/container-hierarchy.png)
+
+### Building the containers
+
+#### Ubuntu 20.04 container with Mellanox OFED - ubuntu2004-mofed
 ```
 pushd ubuntu2004-mofed-docker
 docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed .
@@ -132,27 +132,28 @@ docker push ${acr_name}.azurecr.io/ubuntu2004-mofed
 popd
 ```
 
-### HPCX MPI layer on top of the previous container image - ubuntu2004-mofed-hpcx
+#### HPCX MPI layer on top of the previous container image - ubuntu2004-mofed-hpcx
 ```
 pushd ubuntu2004-mofed-hpcx-docker
 sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
 docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx .
 docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx
 popd
-
 ```
 
-### OpenFoam v10 container - ubuntu2004-mofed-hpcx-openfoam
-
+#### OpenFoam v10 container - ubuntu2004-mofed-hpcx-openfoam
 ```
 pushd ubuntu2004-mofed-hpcx-openfoam-docker
 sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
 docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam .
 docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam
 popd
-
 ```
 ## Running some tests
+
+This is the workflow that starts an MPI job.
+
+![MPI pod lifecycle](images/mpi-pod-lifecycle.png)
 
 ### Testing the IB with IMB-MPI1 PingPong
 
