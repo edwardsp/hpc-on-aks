@@ -457,8 +457,31 @@ kubectl apply -f azurefile-csi-nfs-storageclass.yaml
 ```
 To run the OpenFoam demo, please make sure you have installed helm version 3 on your device.
 
+The file .\openfoam-job\values.yaml.template containes the job parameters, please adjust them to your needs
+
+# Openfoam Job parameters
+jobId: 1
+userName: hpcuser
+userId: 10000
+groupName: hpcuser
+groupId: 10000
+procsPerNode: 120
+procsTotal: 240
+numberOfNodes: 2
+acrName: ACR_NAME
 
 
+
+
+To run the OpenFoam job 
+```
+helm install openfoam-job .\openfoam-job
+```
+
+To cleanup the job, just run the helm unistall command:
+```
+helm uninstall openfoam-job
+```
 
 
 We assume that we have already logged into the first pod and have populated the hostfile.
