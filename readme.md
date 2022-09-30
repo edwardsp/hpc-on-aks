@@ -483,18 +483,16 @@ helm install openfoam-job openfoam-job
 You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with openfoam-0:
 ```
 kubectl get pods
-```
-<pre>
+
 NAME                       READY   STATUS    RESTARTS   AGE
 install-mlx-driver-c8wz4   1/1     Running   0          4h45m
 install-mlx-driver-zkxpd   1/1     Running   0          4h45m
 openfoam-job-0-rqznw       1/1     Running   0          5m17s
 openfoam-job-1-qlblr       1/1     Running   0          5m17s
-</pre>
-```
+
+
 kubectl logs openfoam-job-0-rqznw
-```
-<pre>
+
 streamlines streamlines write:
     Seeded 20 particles
     Sampled 32580 locations
@@ -509,7 +507,7 @@ End
 
 Finalising parallel run
 Running reconstructParMesh on /home/hpcuser/motorbike_scaled
-</pre>
+```
 
 To cleanup the job, just run the helm unistall command:
 ```
