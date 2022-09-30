@@ -473,9 +473,9 @@ acrName: __ACRNAME__
 </pre>
 
 Then substitute the __ACRNAME__ by you container registry name:
-
+```
 sed "s/__ACRNAME__/${acr_name}/g" values.yaml.template > values.yaml
-
+```
 To run the OpenFoam job 
 ```
 helm install openfoam-job .\openfoam-job
