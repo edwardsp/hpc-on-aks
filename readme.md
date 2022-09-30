@@ -408,7 +408,43 @@ hpcuser@mpi-pod1:~$ mpirun -np 2 -npernode 1 -hostfile ~/hostfile -x LD_LIBRARY_
 
 hpcuser@mpi-pod1:~$
 ```
-### Run the OpenFoam demo
+### Add a local ssd or nvme drive as local scratch
+
+This implementation is based on the aks-nvme-ssd-provisioner from Alessando Vozza (https://github.com/ams0/aks-nvme-ssd-provisioner).
+
+We modify the menifests to not need to you a persistant volume claim for each compute node and to mount the disk or raidset under /pv-disks/scratch on the host whcih makes it easier to use with teh kubernetes indexed jobs. 
+
+First we clone the repository and enter the directory:
+```
+git clone https://github.com/ams0/aks-nvme-ssd-provisioner
+pushd aks-nvme-ssd-provisioner
+```
+Then we change the mountpoint and create the docker container and upload it into our container registry:
+```
+sed -i "s/\/pv-disks\/\$UUID/\/pv-disks\/scratch/g" aks-nvme-ssd-provisioner.sh
+docker build -t ${acr_name}.azurecr.io/aks-nvme-ssd-provisioner:v1.0.2 .
+docker push ${acr_name}.azurecr.io/aks-nvme-ssd-provisioner:v1.0.2
+```
+The next step conisists in modifying container registry in the manifest and change the name of the label:
+```
+sed -i "s/ams0/${acr_name}.azurecr.io/g" ./manifests/storage-local-static-provisioner.yaml
+sed -i "s/kubernetes.azure.com\/aks-local-ssd/aks-local-ssd/g" ./manifests/storage-local-static-provisioner.yaml
+```
+Now we are ready to deploy the manifest and leave the directory:
+```
+kubectl apply -f manifests/storage-local-static-provisioner.yaml
+popd
+```
+To apply the changes to the nodepool hb120v2, we need to run the folowing command to add the label aks-local-ssd:
+```
+az aks nodepool update -g ${resource_group} --cluster-name ${acr_name} -n hb120v2 --labels aks-local-ssd=true
+```
+
+### Run the OpenFoam Helm demo
+
+
+
+
 
 We assume that we have already logged into the first pod and have populated the hostfile.
 Let's download the openfoam_demo.sh script to the node:
