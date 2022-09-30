@@ -459,6 +459,7 @@ To run the OpenFoam demo, please make sure you have installed helm version 3 on 
 
 The file .\openfoam-job\values.yaml.template containes the job parameters, please adjust them to your needs
 
+<pre>
 # Openfoam Job parameters
 jobId: 1
 userName: hpcuser
@@ -468,10 +469,12 @@ groupId: 10000
 procsPerNode: 120
 procsTotal: 240
 numberOfNodes: 2
-acrName: ACR_NAME
+acrName: __ACRNAME__
+</pre>
 
+Then substitute the __ACRNAME__ by you container registry name:
 
-
+sed "s/__ACRNAME__/${acr_name}/g" values.yaml.template > values.yaml
 
 To run the OpenFoam job 
 ```
