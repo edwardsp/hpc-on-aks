@@ -408,7 +408,7 @@ hpcuser@mpi-pod1:~$ mpirun -np 2 -npernode 1 -hostfile ~/hostfile -x LD_LIBRARY_
 
 hpcuser@mpi-pod1:~$
 ```
-### Add a local ssd or nvme drive as local scratch
+## Add a local ssd or nvme drive(s) as local scratch
 
 This implementation is based on the aks-nvme-ssd-provisioner from Alessando Vozza (https://github.com/ams0/aks-nvme-ssd-provisioner).
 
@@ -435,13 +435,25 @@ Now we are ready to deploy the manifest and leave the directory:
 kubectl apply -f manifests/storage-local-static-provisioner.yaml
 popd
 ```
+The manifest creates the following kubernetes resources:
+
+*	clusterrolebinding.rbac.authorization.k8s.io/local-storage-provisioner-pv-binding
+*	clusterrole.rbac.authorization.k8s.io/local-storage-provisioner-node-clusterrole
+*	clusterrolebinding.rbac.authorization.k8s.io/local-storage-provisioner-node-binding
+*	serviceaccount/local-storage-admin
+*	configmap/local-provisioner-config
+*	daemonset.apps/local-volume-provisioner
+*	storageclass.storage.k8s.io/local-storage
+
 To apply the changes to the nodepool hb120v2, we need to run the folowing command to add the label aks-local-ssd:
 ```
 az aks nodepool update -g ${resource_group} --cluster-name ${acr_name} -n hb120v2 --labels aks-local-ssd=true
 ```
 
-### Run the OpenFoam Helm demo
 
+## Run the OpenFoam Helm demo
+
+We assume 
 
 
 
