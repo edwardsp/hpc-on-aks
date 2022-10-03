@@ -422,6 +422,7 @@ pushd aks-nvme-ssd-provisioner
 Then we change the mountpoint and create the docker container and upload it into our container registry:
 ```
 sed -i "s/\/pv-disks\/\$UUID/\/pv-disks\/scratch/g" aks-nvme-ssd-provisioner.sh
+sed -i "/^COPY .*$/a RUN chmod +x \/usr\/local\/bin\/aks-nvme-ssd-provisioner.sh" Dockerfile
 docker build -t ${acr_name}.azurecr.io/aks-nvme-ssd-provisioner:v1.0.2 .
 docker push ${acr_name}.azurecr.io/aks-nvme-ssd-provisioner:v1.0.2
 ```
