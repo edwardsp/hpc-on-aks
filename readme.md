@@ -447,7 +447,7 @@ The manifest creates the following kubernetes resources:
 
 To apply the changes to the nodepool hb120v2, we need to run the folowing command to add the label aks-local-ssd:
 ```
-az aks nodepool update -g ${resource_group} --cluster-name ${acr_name} -n hb120v2 --labels aks-local-ssd=true
+az aks nodepool update -g ${resource_group} --cluster-name ${aks_cluster_name} -n hb120v2 --labels aks-local-ssd=true
 ```
 ## Run the OpenFoam Helm demo
 
