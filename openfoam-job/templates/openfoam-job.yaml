@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: 'openfoam-job'
+  name: {{ .Release.Name }}
 spec:
   completions: {{ .Values.numberOfNodes }}
   parallelism: {{ .Values.numberOfNodes }}
@@ -34,9 +34,9 @@ spec:
           printf "[ %6d ] Starting SSH daemon\n" $SECONDS
           /etc/init.d/ssh start
           
-          printf "[ %6d ] Creating IP file (/home/jobs/{{ .Values.jobId }}/hosts/${POD_IP})\n" $SECONDS
-          mkdir -p /home/jobs/{{ .Values.jobId }}/hosts
-          touch /home/jobs/{{ .Values.jobId }}/hosts/${POD_IP}
+          printf "[ %6d ] Creating IP file (/home/jobs/{{ .Release.Name }}/hosts/${POD_IP})\n" $SECONDS
+          mkdir -p /home/jobs/{{ .Release.Name }}/hosts
+          touch /home/jobs/{{ .Release.Name }}/hosts/${POD_IP}
           
           if [ "${JOB_COMPLETION_INDEX}" = "0" ]; then
             printf "[ %6d ] Adding user with homedir ({{ .Values.userName }})\n" $SECONDS
@@ -58,13 +58,13 @@ spec:
             fi
             
             printf "[ %6d ] Waiting for hosts\n" $SECONDS
-            while [ "$(ls /home/jobs/{{ .Values.jobId }}/hosts | wc -l)" != "{{ .Values.numberOfNodes }}" ]; do
-              printf "[ %6d ] - hosts available: $(ls /home/jobs/{{ .Values.jobId }}/hosts | wc -l) out of {{ .Values.numberOfNodes }}\n" $SECONDS
+            while [ "$(ls /home/jobs/{{ .Release.Name }}/hosts | wc -l)" != "{{ .Values.numberOfNodes }}" ]; do
+              printf "[ %6d ] - hosts available: $(ls /home/jobs/{{ .Release.Name }}/hosts | wc -l) out of {{ .Values.numberOfNodes }}\n" $SECONDS
               sleep 10
             done
             
             printf "[ %6d ] Creating hostfile\n" $SECONDS
-            ls /home/jobs/{{ .Values.jobId }}/hosts > /home/{{ .Values.userName }}/hostfile
+            ls /home/jobs/{{ .Release.Name }}/hosts > /home/{{ .Values.userName }}/hostfile
             printf "[ %6d ] Hostfile contents:\n" $SECONDS
             cat /home/{{ .Values.userName }}/hostfile
             chown {{ .Values.userName }}:{{ .Values.groupName }} /home/{{ .Values.userName }}/hostfile
@@ -107,16 +107,16 @@ spec:
         - name: FIO_SIZE
           value: 1G
         volumeMounts:
-        - name: homedir
+        - name: {{ .Release.Name }}-homedir
           mountPath: /home
         - name: scratch
           mountPath: /scratch
         - name: actions
           mountPath: "/opt/actions"         
       volumes:
-      - name: homedir
+      - name: {{ .Release.Name }}-homedir
         persistentVolumeClaim:
-          claimName: homedir
+          claimName: {{ .Release.Name }}-homedir
       - name: scratch
         hostPath:
           path: /pv-disks/scratch

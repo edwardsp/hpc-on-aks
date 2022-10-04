@@ -462,7 +462,6 @@ The file .\openfoam-job\values.yaml.template containes the job parameters, pleas
 
 <pre>
 # Openfoam Job parameters
-jobId: 1
 userName: hpcuser
 userId: 10000
 groupName: hpcuser
@@ -479,20 +478,21 @@ sed "s/__ACRNAME__/${acr_name}/g" values.yaml.template > values.yaml
 ```
 To run the OpenFoam job 
 ```
-helm install openfoam-job openfoam-job
+# helm install <release-name> <chart>
+helm install myopenfoamjob openfoam-job
 ```
-You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with openfoam-0:
+You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with myopenfoamjob-0:
 ```
 kubectl get pods
 
 NAME                       READY   STATUS    RESTARTS   AGE
 install-mlx-driver-c8wz4   1/1     Running   0          4h45m
 install-mlx-driver-zkxpd   1/1     Running   0          4h45m
-openfoam-job-0-rqznw       1/1     Running   0          5m17s
-openfoam-job-1-qlblr       1/1     Running   0          5m17s
+myopenfoamjob-0-rqznw       1/1     Running   0          5m17s
+myopenfoamjob-1-qlblr       1/1     Running   0          5m17s
 ```
 ```
-kubectl logs openfoam-job-0-rqznw
+kubectl logs myopenfoamjob-0-rqznw
 
 streamlines streamlines write:
     Seeded 20 particles
@@ -512,5 +512,5 @@ Running reconstructParMesh on /home/hpcuser/motorbike_scaled
 
 To cleanup the job, just run the helm unistall command:
 ```
-helm uninstall openfoam-job
+helm uninstall myopenfoamjob
 ```

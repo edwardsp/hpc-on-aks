@@ -1,5 +1,4 @@
 # Openfoam Job parameters
-jobId: 1
 userName: hpcuser
 userId: 10000
 groupName: hpcuser
