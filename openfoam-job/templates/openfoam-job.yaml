@@ -79,11 +79,11 @@ spec:
           EOF
             RESULT=$?
             
-            printf "[ %6d ] Writing completion file (/home/jobs/${JOB_ID}/complete)\n" $SECONDS
+            printf "[ %6d ] Writing completion file (/home/jobs/{{ .Release.Name }}/complete)\n" $SECONDS
             if [ "$RESULT" = "0" ]; then
-              echo "success" > /home/jobs/${JOB_ID}/complete
+              echo "success" > /home/jobs/{{ .Release.Name }}/complete
             else
-              echo "failure ($RESULT)" > /home/jobs/${JOB_ID}/complete
+              echo "failure ($RESULT)" > /home/jobs/{{ .Release.Name }}/complete
             fi
           else
             printf "[ %6d ] Adding user ({{ .Values.userName }})\n" $SECONDS
@@ -91,12 +91,12 @@ spec:
             adduser --disabled-password --uid {{ .Values.userId }} --ingroup {{ .Values.groupName }} --no-create-home --gecos "" {{ .Values.userName }}
             printf "[ %6d ] User added ($(getent passwd $user > /dev/null))\n" $SECONDS
             
-            printf "[ %6d ] Waiting for job completion (/home/jobs/${JOB_ID}/complete)\n" $SECONDS
-            while [ ! -f /home/jobs/${JOB_ID}/complete ]; do
+            printf "[ %6d ] Waiting for job completion (/home/jobs/{{ .Release.Name }}/complete)\n" $SECONDS
+            while [ ! -f /home/jobs/{{ .Release.Name }}/complete ]; do
               sleep 10
             done
           fi
-          printf "[ %6d ] Exiting, status: $(</home/jobs/${JOB_ID}/complete))\n" $SECONDS
+          printf "[ %6d ] Exiting, status: $(</home/jobs/{{ .Release.Name }}/complete))\n" $SECONDS
         env:
         - name: POD_IP
           valueFrom:
