@@ -1,0 +1,5 @@
+apiVersion: v3
+name: imbmpi-allreduce-yunikorn-job
+description: A Helm chart to run the IMB MPI1 Allreduce benchmark on AKS with the YuniKorn scheduler
+version: 0.1.0
+appVersion: 0.1.0
