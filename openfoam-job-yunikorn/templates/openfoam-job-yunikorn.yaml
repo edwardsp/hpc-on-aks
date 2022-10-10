@@ -10,15 +10,15 @@ spec:
   template:
     metadata:
       labels:
-        app: openfoam
-        applicationsId: {{ .Release.Name }}
-        queue: root.default
+        app: openfoam-job
+        applicationId: {{ .Release.Name }}
+        queue: root.sandbox
       annotations:
-        yunikorn.apache.org/schedulingPolicyParameters: "gangSchedulingStyle=Hard placeholderTimeoutInSeconds=3600"
-        yunikorn.apache.org/task-group-name: task-grpup-openfoam
+        #yunikorn.apache.org/schedulingPolicyParameters: "gangSchedulingStyle=Hard placeholderTimeoutInSeconds=3600"
+        yunikorn.apache.org/task-group-name: {{ .Release.Name }}-task-group
         yunikorn.apache.org/task-groups: |-
           [{
-              "name": "task-group-openfoam",
+              "name": "{{ .Release.Name }}-task-group",
               "minMember": {{ .Values.numberOfNodes }},
               "minResource": {
                 "cpu": "105",
@@ -29,8 +29,8 @@ spec:
               "affinity": {}
           }]
     spec:
-      restartPolicy: Never
       schedulerName: yunikorn
+      restartPolicy: Never
       containers:
       - name: worker
         image: {{ .Values.acrName }}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam:latest
