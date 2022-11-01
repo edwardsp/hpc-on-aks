@@ -10,7 +10,7 @@ spec:
   template:
     metadata:
       labels:
-        app: allreduce-job
+        app: {{ .Release.Name }}
         applicationId: {{ .Release.Name }}
         queue: root.sandbox
       annotations:
@@ -20,11 +20,10 @@ spec:
               "name": "{{ .Release.Name }}-task-group",
               "minMember": {{ .Values.numberOfNodes }},
               "minResource": {
+                "mellanox.com/shared_hca_rdma": 1,
                 "cpu": 112
               },
-              "nodeSelector": {
-                "agentpool": "hb120v2"
-              },
+              "nodeSelector": {},
               "tolerations": []
           }]
     spec:
@@ -42,8 +41,9 @@ spec:
         resources:
           requests:
             cpu: 112
+            mellanox.com/shared_hca_rdma: 1
           limits:
-            cpu: 112
+            mellanox.com/shared_hca_rdma: 1
         command:
         - bash
         - /opt/actions/hpcx-run

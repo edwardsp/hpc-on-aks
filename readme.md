@@ -467,7 +467,6 @@ userId: 10000
 groupName: hpcuser
 groupId: 10000
 procsPerNode: 120
-procsTotal: 240
 numberOfNodes: 2
 acrName: __ACRNAME__
 </pre>

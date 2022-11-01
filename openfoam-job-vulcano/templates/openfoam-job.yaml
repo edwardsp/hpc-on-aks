@@ -24,8 +24,8 @@ spec:
             limits:
               mellanox.com/shared_hca_rdma: 1
           command:
-          - "bash"
-          - "/opt/actions/hpcx-run"
+          - bash
+          - /opt/actions/hpcx-run
           - |
             cp /opt/actions/openfoam-demo-action ./openfoam_demo.sh
             chmod u+x ./openfoam_demo.sh
@@ -35,6 +35,10 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
           - name: DBENCH_MOUNTPOINT
             value: /scratch
           - name: FIO_SIZE
@@ -83,18 +87,8 @@ data:
     adduser --disabled-password --uid {{ .Values.userId }} --ingroup {{ .Values.groupName }} --no-create-home --gecos "" {{ .Values.userName }}
     printf "[ %6d ] User added ($(getent passwd $user > /dev/null))\n" $SECONDS
 
-    printf "[ %6d ] Waiting for hosts\n" $SECONDS
-    while [ "$(ls /home/jobs/{{ .Release.Name }}/hosts | wc -l)" != "{{ .Values.numberOfNodes }}" ]; do
-      printf "[ %6d ] - hosts available: $(ls /home/jobs/{{ .Release.Name }}/hosts | wc -l) out of {{ .Values.numberOfNodes }}\n" $SECONDS
-      sleep 10
-    done
-    if [ "$(ls /home/jobs/{{ .Release.Name }}/hosts | head -n1)" = "${POD_IP}" ]; then
-      AM_I_ROOT_POD=1
-    else
-      AM_I_ROOT_POD=0
-    fi
-
-    if [ "${AM_I_ROOT_POD}" = "1" ]; then
+    # check pod rank
+    if [ "${POD_NAME##*-}" = "0" ]; then
       printf "[ %6d ] Creating homedir for ({{ .Values.userName }})\n" $SECONDS
       mkhomedir_helper {{ .Values.userName }}
 
@@ -111,6 +105,12 @@ data:
         echo -e "SSH keys already exist"
       fi
       
+      printf "[ %6d ] Waiting for hosts\n" $SECONDS
+      while [ "$(ls /home/jobs/{{ .Release.Name }}/hosts | wc -l)" != "{{ .Values.numberOfNodes }}" ]; do
+        printf "[ %6d ] - hosts available: $(ls /home/jobs/{{ .Release.Name }}/hosts | wc -l) out of {{ .Values.numberOfNodes }}\n" $SECONDS
+        sleep 10
+      done
+
       printf "[ %6d ] Creating hostfile\n" $SECONDS
       ls /home/jobs/{{ .Release.Name }}/hosts > /home/{{ .Values.userName }}/hostfile
       printf "[ %6d ] Hostfile contents:\n" $SECONDS
@@ -150,7 +150,7 @@ data:
     source /opt/openfoam10/etc/bashrc
     
     CASE_NAME=motorbike_scaled
-    CORES={{ .Values.procsTotal }}
+    CORES={{ mul .Values.numberOfNodes .Values.procsPerNode }}
     PPN={{ .Values.procsPerNode }}
     
     cp -r $WM_PROJECT_DIR/tutorials/incompressible/simpleFoam/motorBike $CASE_NAME
