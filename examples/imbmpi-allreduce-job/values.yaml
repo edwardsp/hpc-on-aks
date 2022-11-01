@@ -5,4 +5,4 @@ groupName: hpcuser
 groupId: 10000
 procsPerNode: 120
 numberOfNodes: 2
-acrName: __ACRNAME__
+acrName:

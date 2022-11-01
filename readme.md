@@ -111,6 +111,7 @@ To check the installation:
 kubectl get pods
 kubectl logs <name of installation pod>
 ```
+
 ## Containers
 
 The containers have created based on the scripting from [azhpc-images](https://github.com/Azure/azhpc-images) GitHub repo.  However, it has been separated into the following hierarchy:
@@ -149,18 +150,13 @@ docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam .
 docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam
 popd
 ```
-## Running some tests
 
-This is the workflow that starts an MPI job.
+## Testing IB with IMB-MPI PingPong
 
-![MPI pod lifecycle](images/mpi-pod-lifecycle.png)
-
-### Testing the IB with IMB-MPI1 PingPong
-
-The example `pingpong-mpi-job.yaml.template` is an example running the IMB-MPI1 PingPong test.  It is parameterized on ACR name and the number of nodes to use.  Create the YAML as follows:
+An example, `pingpong-mpi-job.yaml.template`, is provided to run the IMB-MPI1 PingPong test.  It is parameterized on the ACR name and so the YAML can be created as follows:
 
 ```
-sed "s/__ACRNAME__/${acr_name}/g;s/__NNODES__/2/g" pingpong-mpi-job.yaml.template > pingpong-mpi-job.yaml
+sed "s/__ACRNAME__/${acr_name}/g" examples/pingpong-mpi-job.yaml.template > examples/pingpong-mpi-job.yaml
 ```
 
 This example uses an `indexed-job` to run the MPI test.  All the initialization and start-up is embedded in the command.  The pods will all terminate once the job is complete although the storage remains.  The `index` is used to find the first pod and this will create the home directory, ssh keys, hostfile and launch `mpirun`.  Here is an overview of steps:
@@ -182,7 +178,7 @@ This example uses an `indexed-job` to run the MPI test.  All the initialization 
 Deploy with:
 
 ```
-kubectl apply -f pingpong-mpi-job.yaml
+kubectl apply -f examples/pingpong-mpi-job.yaml
 ```
 
 The mpirun output will be in the first pod.  You can find this with:
@@ -200,98 +196,59 @@ kubectl logs indexed-job-0-XXXXX
 This is example output:
 
 ```
-[      0 ] Starting SSH daemon
- * Starting OpenBSD Secure Shell server sshd
-   ...done.
-[      0 ] Creating IP file (/home/hosts/10.244.28.5)
-[      0 ] Adding user with homedir (hpcuser)
-Adding group `hpcuser' (GID 1000) ...
-Done.
-Adding user `hpcuser' ...
-Adding new user `hpcuser' (1000) with group `hpcuser' ...
-Creating home directory `/home/hpcuser' ...
-Copying files from `/etc/skel' ...
-[      0 ] User added ()
-[      0 ] Creating ssh key
-[      1 ] Waiting for hosts
-[      1 ] - hosts available: 1 out of 2
-[     11 ] - hosts available: 1 out of 2
-[     21 ] Creating hostfile
-[     21 ] Hostfile contents:
-10.244.28.5
-10.244.29.5
-[     21 ] Launching MPI
-Loading mpi/hpcx
-  Loading requirement:
-    /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/modulefiles/hpcx
-Warning: Permanently added '10.244.29.5' (ECDSA) to the list of known hosts.
-[indexed-job-0:00092] MCW rank 0 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
-[indexed-job-1:00062] MCW rank 1 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
-#------------------------------------------------------------
-#    Intel (R) MPI Benchmarks 2018, MPI-1 part
-#------------------------------------------------------------
-# Date                  : Fri Sep 16 15:20:51 2022
-# Machine               : x86_64
-# System                : Linux
-# Release               : 5.4.0-1089-azure
-# Version               : #94~18.04.1-Ubuntu SMP Fri Aug 5 12:34:50 UTC 2022
-# MPI Version           : 3.1
-# MPI Thread Environment:
-
-
-# Calling sequence was:
-
-# /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 PingPong  
-
-# Minimum message length in bytes:   0
-# Maximum message length in bytes:   4194304
-#
-# MPI_Datatype                   :   MPI_BYTE
-# MPI_Datatype for reductions    :   MPI_FLOAT
-# MPI_Op                         :   MPI_SUM
-#
-#
-
-# List of Benchmarks to run:
-
-# PingPong
-
 #---------------------------------------------------
 # Benchmarking PingPong
 # #processes = 2
 #---------------------------------------------------
        #bytes #repetitions      t[usec]   Mbytes/sec
-            0         1000         1.79         0.00
-            1         1000         1.78         0.56
-            2         1000         1.78         1.13
-            4         1000         1.79         2.24
-            8         1000         1.78         4.49
-           16         1000         1.79         8.96
-           32         1000         1.93        16.62
-           64         1000         2.07        30.97
-          128         1000         2.08        61.43
-          256         1000         2.66        96.08
-          512         1000         2.82       181.39
-         1024         1000         2.91       351.81
-         2048         1000         3.13       654.76
-         4096         1000         3.71      1103.37
-         8192         1000         4.31      1900.06
-        16384         1000         5.60      2923.27
-        32768         1000         7.75      4230.65
-        65536          640        10.91      6004.71
-       131072          320        17.11      7662.75
-       262144          160        19.86     13202.82
-       524288           80        32.01     16380.15
-      1048576           40        55.18     19003.71
-      2097152           20       103.34     20293.98
-      4194304           10       198.12     21170.38
-
-
-# All processes entering MPI_Finalize
-
-[     22 ] Writing completion file (/home/complete)
-[     22 ] Exiting, status: success)
+            0         1000         1.68         0.00
+            1         1000         1.68         0.59
+            2         1000         1.68         1.19
+            4         1000         1.69         2.36
+            8         1000         1.69         4.73
+           16         1000         1.69         9.45
+           32         1000         1.88        17.02
+           64         1000         1.98        32.36
+          128         1000         2.02        63.25
+          256         1000         2.60        98.30
+          512         1000         2.73       187.41
+         1024         1000         2.77       369.03
+         2048         1000         3.10       660.86
+         4096         1000         3.75      1091.99
+         8192         1000         4.27      1919.30
+        16384         1000         5.53      2962.70
+        32768         1000         7.60      4309.94
+        65536          640        10.86      6032.44
+       131072          320        16.94      7736.39
+       262144          160        19.57     13395.44
+       524288           80        30.64     17113.45
+      1048576           40        53.36     19650.28
+      2097152           20        98.84     21218.09
+      4194304           10       181.01     23172.19
 ```
+
+## Launching with Helm
+
+```
+helm install allreduce examples/imbmpi-allreduce-job --set procsPerNode=120,numberOfNodes=2,acrName=${acr_name}
+```
+
+
+
+
+
+
+
+
+
+
+
+## Running some tests
+
+This is the workflow that starts an MPI job.
+
+![MPI pod lifecycle](images/mpi-pod-lifecycle.png)
+
 
 ### Testing the MPI layer
 
@@ -446,7 +403,7 @@ The manifest creates the following kubernetes resources:
 *	daemonset.apps/local-volume-provisioner
 *	storageclass.storage.k8s.io/local-storage
 
-To apply the changes to the nodepool hb120v2, we need to run the folowing command to add the label aks-local-ssd:
+To apply the changes to the nodepool hb120v2, we need to run the following command to add the label aks-local-ssd:
 ```
 az aks nodepool update -g ${resource_group} --cluster-name ${aks_cluster_name} -n hb120v2 --labels aks-local-ssd=true
 ```
