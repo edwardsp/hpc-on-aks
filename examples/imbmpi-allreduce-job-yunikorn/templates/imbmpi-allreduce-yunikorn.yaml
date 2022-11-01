@@ -53,10 +53,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
-        - name: DBENCH_MOUNTPOINT
-          value: /scratch
-        - name: FIO_SIZE
-          value: 1G
         volumeMounts:
         - name: {{ .Release.Name }}-homedir
           mountPath: /home
@@ -68,10 +64,6 @@ spec:
       - name: {{ .Release.Name }}-homedir
         persistentVolumeClaim:
           claimName: {{ .Release.Name }}-homedir
-      - name: scratch
-        hostPath:
-          path: /pv-disks/scratch
-          type: Directory
       - name: actions
         configMap:
           name: {{ .Release.Name }}-configmap

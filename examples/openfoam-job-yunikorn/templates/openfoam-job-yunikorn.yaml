@@ -57,10 +57,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
-        - name: DBENCH_MOUNTPOINT
-          value: /scratch
-        - name: FIO_SIZE
-          value: 1G
         volumeMounts:
         - name: {{ .Release.Name }}-homedir
           mountPath: /home
@@ -169,7 +165,7 @@ data:
     source /opt/openfoam10/etc/bashrc
     
     CASE_NAME=motorbike_scaled
-    CORES={{ .Values.procsTotal }}
+    CORES={{ mul .Values.numberOfNodes .Values.procsPerNode }}
     PPN={{ .Values.procsPerNode }}
     
     cp -r $WM_PROJECT_DIR/tutorials/incompressible/simpleFoam/motorBike $CASE_NAME

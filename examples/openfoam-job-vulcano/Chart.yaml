@@ -1,5 +1,0 @@
-apiVersion: v3
-name: openfoam-job-vulcano
-description: A Helm chart to create an OpenFoam MPI job on AKS
-version: 0.1.0
-appVersion: 0.1.0
