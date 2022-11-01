@@ -196,6 +196,7 @@ kubectl logs indexed-job-0-XXXXX
 This is example output:
 
 ```
+...
 #---------------------------------------------------
 # Benchmarking PingPong
 # #processes = 2
@@ -229,12 +230,21 @@ This is example output:
 
 ## Launching with Helm
 
+NOTE: need storage class here
+
 ```
 helm install allreduce examples/imbmpi-allreduce-job --set procsPerNode=120,numberOfNodes=2,acrName=${acr_name}
 ```
 
+Breaking the scheduler
+```
+for i in `seq -w 1 20`; do for j in `seq -w 4 4`; do helm install allreduce-${j}n-${i} imbmpi-allreduce-job --set numberOfNodes=${j},acrName=${acr_name}; done; done
+```
 
-
+Removing all helm jobs
+```
+helm list | grep -v NAME | cut -f 1 | xargs helm uninstall
+```
 
 
 
