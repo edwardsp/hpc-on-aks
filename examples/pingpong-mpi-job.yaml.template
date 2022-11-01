@@ -24,8 +24,8 @@ kind: Job
 metadata:
   name: 'indexed-job'
 spec:
-  completions: __NNODES__
-  parallelism: __NNODES__
+  completions: 2
+  parallelism: 2
   completionMode: Indexed
   template:
     spec:
@@ -48,7 +48,7 @@ spec:
         - |
           SECONDS=0
           USERNAME=hpcuser
-          NHOSTS=__NNODES__
+          NHOSTS=2
           
           printf "[ %6d ] Starting SSH daemon\n" $SECONDS
           /etc/init.d/ssh start
