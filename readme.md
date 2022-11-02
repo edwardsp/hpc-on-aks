@@ -318,12 +318,12 @@ helm uninstall myopenfoamjob
 
 This implementation is based on the aks-nvme-ssd-provisioner from Alessando Vozza (https://github.com/ams0/aks-nvme-ssd-provisioner).
 
-We modify the menifests to not need to you a persistant volume claim for each compute node and to mount the disk or raidset under /pv-disks/scratch on the host whcih makes it easier to use with teh kubernetes indexed jobs. 
+We modify the manifests to create a persistent volume claim for each compute node and to mount the disk or raidset under `/pv-disks/scratch` on the host.  This provides a consistent place to add for the kubernetes indexed jobs. 
 
 First we clone the repository and enter the directory:
 ```
 git clone https://github.com/ams0/aks-nvme-ssd-provisioner
-pushd aks-nvme-ssd-provisioner
+cd aks-nvme-ssd-provisioner
 ```
 Then we change the mountpoint and create the docker container and upload it into our container registry:
 ```
@@ -340,7 +340,6 @@ sed -i "s/kubernetes.azure.com\/aks-local-ssd/aks-local-ssd/g" ./manifests/stora
 Now we are ready to deploy the manifest and leave the directory:
 ```
 kubectl apply -f manifests/storage-local-static-provisioner.yaml
-popd
 ```
 The manifest creates the following kubernetes resources:
 
@@ -398,20 +397,3 @@ Run status group 0 (all jobs):
 Disk stats (read/write):
   nvme0n1: ios=0/133975, merge=0/0, ticks=0/251799, in_queue=18980, util=99.45%
 ```
-
-
-
-
-
-
-
-
-## Running some tests
-
-This is the workflow that starts an MPI job.
-
-![MPI pod lifecycle](images/mpi-pod-lifecycle.png)
-
-
-
-

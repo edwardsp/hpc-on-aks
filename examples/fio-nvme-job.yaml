@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: 'indexed-job'
+  name: 'fio-nvme-job'
 spec:
   completions: 1
   parallelism: 1
