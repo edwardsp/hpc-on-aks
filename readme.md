@@ -246,7 +246,11 @@ Removing all helm jobs
 helm list | grep -v NAME | cut -f 1 | xargs helm uninstall
 ```
 
-## Run the OpenFoam Helm demo
+
+## Schedulers
+
+
+## Run the OpenFoam Using Helm and YuniKorn
 
 We assume that the the previous demos have been run. If not, please add the storageclass by running:
 
