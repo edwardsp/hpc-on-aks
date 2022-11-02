@@ -60,18 +60,12 @@ spec:
         volumeMounts:
         - name: {{ .Release.Name }}-homedir
           mountPath: /home
-        - name: scratch
-          mountPath: /scratch
         - name: actions
           mountPath: "/opt/actions"         
       volumes:
       - name: {{ .Release.Name }}-homedir
         persistentVolumeClaim:
           claimName: {{ .Release.Name }}-homedir
-      - name: scratch
-        hostPath:
-          path: /pv-disks/scratch
-          type: Directory
       - name: actions
         configMap:
           name: {{ .Release.Name }}-configmap

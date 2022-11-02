@@ -246,8 +246,66 @@ Removing all helm jobs
 helm list | grep -v NAME | cut -f 1 | xargs helm uninstall
 ```
 
+## Run the OpenFoam Helm demo
 
+We assume that the the previous demos have been run. If not, please add the storageclass by running:
+```
+kubectl apply -f azurefile-csi-nfs-storageclass.yaml
+```
+To run the OpenFoam demo, please make sure you have installed helm version 3 on your device.
 
+The file `examples/openfoam-job/values.yaml` containes the job parameters which can be adjusted or overridden:
+
+```
+# Openfoam Job parameters
+userName: hpcuser
+userId: 10000
+groupName: hpcuser
+groupId: 10000
+procsPerNode: 120
+numberOfNodes: 2
+acrName: 
+```
+
+To run the OpenFoam job 
+```
+# helm install <release-name> <chart>
+helm install myopenfoamjob openfoam-job --set acrName=${acr_name}
+
+```
+You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with myopenfoamjob-0.  Get the pods with `kubectl get pods`:
+
+```
+NAME                       READY   STATUS    RESTARTS   AGE
+install-mlx-driver-c8wz4   1/1     Running   0          4h45m
+install-mlx-driver-zkxpd   1/1     Running   0          4h45m
+myopenfoamjob-0-rqznw       1/1     Running   0          5m17s
+myopenfoamjob-1-qlblr       1/1     Running   0          5m17s
+```
+
+And, view the logs with `kubectl logs myopenfoamjob-0-rqznw`:
+
+```
+streamlines streamlines write:
+    Seeded 20 particles
+    Sampled 32580 locations
+forceCoeffs forceCoeffs1 write:
+    Cm    = 0.156646
+    Cd    = 0.406473
+    Cl    = 0.071285
+    Cl(f) = 0.192289
+    Cl(r) = -0.121004
+
+End
+
+Finalising parallel run
+Running reconstructParMesh on /home/hpcuser/motorbike_scaled
+```
+
+To cleanup the job, just run the helm unistall command:
+```
+helm uninstall myopenfoamjob
+```
 
 ## Using local NVME as scratch
 
@@ -350,182 +408,5 @@ This is the workflow that starts an MPI job.
 ![MPI pod lifecycle](images/mpi-pod-lifecycle.png)
 
 
-### Testing the MPI layer
-
-In this example we will deploy the OpenFoam container on two pods. Each pod will run on a single host. To run MPI worklouds we will need to optain the IP addesses of the two pods once the yare running. 
-
-* TODO: Get IP addresses for hostfile
-
-```
-kubectl 
-```
-We start deployeing the pods:
-```
-sed "s/__ACRNAME__/${acr_name}/g" test-openfoam.yaml.template > test-openfoam.yaml
-kubectl apply -f test-openfoam.yaml
-```
-We can check the status of the pods:
-
-```
-kubectl get pods 
-```
-After the pods are up we can chekc for the internal IP address:
-```
-kubectl get pods of-mpi-pod1 of-mpi-pod2 -o custom-columns=NAME:.metadata.name,PodIP:status.podIP
-NAME          PodIP
-of-mpi-pod1   10.244.2.7
-of-mpi-pod2   10.244.3.6
-```
-Now we can connect to the first pod and switch to the hpcuser:
-```
-kubectl exec -it mpi-pod1 -- bash
-sudo su - hpcuser
-```
-To simplify launching mpi worklouds we can store the IP addresses in a hostfile.
-
-```
-cat ~/hostfile
-
-10.244.2.7
-10.244.3.6
-```
-We load the HPC-X MPI environemnt module.
-```
-module load mpi/hpcx
-```
-Then we run a simple IMB-MPI1 PingPong test:
-
-look it works :-)
-
-```
-hpcuser@mpi-pod1:~$ mpirun -np 2 -npernode 1 -hostfile ~/hostfile -x LD_LIBRARY_PATH -x UCX_TLS=rc -report-bindings /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 PingPong 
-[mpi-pod1:00232] MCW rank 0 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
-[mpi-pod2:00170] MCW rank 1 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.][./././././././././././././././././././././././././././././././././././././././././././././././././././././././././././.]
-#------------------------------------------------------------
-#    Intel (R) MPI Benchmarks 2018, MPI-1 part
-#------------------------------------------------------------
-# Date                  : Fri Sep  9 16:54:32 2022
-# Machine               : x86_64
-# System                : Linux
-# Release               : 5.4.0-1089-azure
-# Version               : #94~18.04.1-Ubuntu SMP Fri Aug 5 12:34:50 UTC 2022
-# MPI Version           : 3.1
-# MPI Thread Environment:
 
 
-# Calling sequence was:
-
-# /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 PingPong
-
-# Minimum message length in bytes:   0
-# Maximum message length in bytes:   4194304
-#
-# MPI_Datatype                   :   MPI_BYTE
-# MPI_Datatype for reductions    :   MPI_FLOAT
-# MPI_Op                         :   MPI_SUM
-#
-#
-
-# List of Benchmarks to run:
-
-# PingPong
-
-#---------------------------------------------------
-# Benchmarking PingPong
-# #processes = 2
-#---------------------------------------------------
-       #bytes #repetitions      t[usec]   Mbytes/sec
-            0         1000         1.69         0.00
-            1         1000         1.69         0.59
-            2         1000         1.68         1.19
-            4         1000         1.74         2.30
-            8         1000         1.69         4.73
-           16         1000         1.70         9.43
-           32         1000         1.89        16.94
-           64         1000         1.97        32.49
-          128         1000         2.02        63.29
-          256         1000         2.61        97.97
-          512         1000         2.75       185.89
-         1024         1000         2.78       368.82
-         2048         1000         3.06       670.01
-         4096         1000         3.74      1095.95
-         8192         1000         4.25      1926.70
-        16384         1000         5.53      2962.20
-        32768         1000         7.56      4334.91
-        65536          640        10.82      6057.67
-       131072          320        16.79      7805.51
-       262144          160        19.38     13529.41
-       524288           80        30.17     17375.04
-      1048576           40        52.75     19878.20
-      2097152           20        97.51     21506.12
-      4194304           10       183.81     22818.79
-
-
-# All processes entering MPI_Finalize
-
-hpcuser@mpi-pod1:~$
-```
-
-## Run the OpenFoam Helm demo
-
-We assume that the the previous demos have been run. If not, please add the storageclass by running:
-```
-kubectl apply -f azurefile-csi-nfs-storageclass.yaml
-```
-To run the OpenFoam demo, please make sure you have installed helm version 3 on your device.
-
-The file .\openfoam-job\values.yaml.template containes the job parameters, please adjust them to your needs
-
-<pre>
-# Openfoam Job parameters
-userName: hpcuser
-userId: 10000
-groupName: hpcuser
-groupId: 10000
-procsPerNode: 120
-numberOfNodes: 2
-acrName: __ACRNAME__
-</pre>
-
-Then substitute the __ACRNAME__ by you container registry name:
-```
-sed "s/__ACRNAME__/${acr_name}/g" values.yaml.template > values.yaml
-```
-To run the OpenFoam job 
-```
-# helm install <release-name> <chart>
-helm install myopenfoamjob openfoam-job
-```
-You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with myopenfoamjob-0:
-```
-kubectl get pods
-
-NAME                       READY   STATUS    RESTARTS   AGE
-install-mlx-driver-c8wz4   1/1     Running   0          4h45m
-install-mlx-driver-zkxpd   1/1     Running   0          4h45m
-myopenfoamjob-0-rqznw       1/1     Running   0          5m17s
-myopenfoamjob-1-qlblr       1/1     Running   0          5m17s
-```
-```
-kubectl logs myopenfoamjob-0-rqznw
-
-streamlines streamlines write:
-    Seeded 20 particles
-    Sampled 32580 locations
-forceCoeffs forceCoeffs1 write:
-    Cm    = 0.156646
-    Cd    = 0.406473
-    Cl    = 0.071285
-    Cl(f) = 0.192289
-    Cl(r) = -0.121004
-
-End
-
-Finalising parallel run
-Running reconstructParMesh on /home/hpcuser/motorbike_scaled
-```
-
-To cleanup the job, just run the helm unistall command:
-```
-helm uninstall myopenfoamjob
-```
