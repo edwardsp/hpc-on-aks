@@ -459,16 +459,68 @@ helm install mydevitojob examples/devito-job-yunikorn --set acrName=${acr_name} 
 ```
 You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with myopenfoamjob-0.  Get the pods with `kubectl get pods`:
 ```
-NAME                       READY   STATUS    RESTARTS   AGE
-install-mlx-driver-c8wz4   1/1     Running   0          4h45m
-install-mlx-driver-zkxpd   1/1     Running   0          4h45m
-mydevitojob-0-rqznw       1/1     Running   0          5m17s
-mydevitojob-1-qlblr       1/1     Running   0          5m17s
+NAME                                                    READY   STATUS              RESTARTS   AGE
+install-mlx-driver-v4xc8                                1/1     QuotaApproved       0          9h
+install-mlx-driver-vvsqb                                1/1     QuotaApproved       0          9h
+mydevitojob-0-vbpvt                                     0/1     ContainerCreating   0          3s
+mydevitojob-1-4bv9h                                     0/1     ContainerCreating   0          3s
 ```
 
-And, view the logs with `kubectl logs mydevitojob-0-rqznw`:
+And, view the logs with `kubectl logs mydevitojob-0-vbpvt`:
 
 ```
+[      0 ] Starting SSH daemon
+ * Starting OpenBSD Secure Shell server sshd
+   ...done.
+[      0 ] Creating IP file (/home/jobs/mydevitojob/hosts/10.244.17.27)
+[      0 ] Adding user with homedir (hpcuser)
+Adding group `hpcuser' (GID 10000) ...
+Done.
+Adding user `hpcuser' ...
+Adding new user `hpcuser' (10000) with group `hpcuser' ...
+Creating home directory `/home/hpcuser' ...
+Copying files from `/etc/skel' ...
+[      1 ] User added ()
+[      1 ] Creating ssh key
+[      1 ] Waiting for hosts
+[      1 ] Creating hostfile
+[      1 ] Hostfile contents:
+10.244.17.27
+10.244.18.28
+[      1 ] Launching MPI
+Loading mpi/hpcx
+  Loading requirement:
+    /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/modulefiles/hpcx
+
+Successfully created the resource.
+Warning: Permanently added '10.244.18.28' (ECDSA) to the list of known hosts.
+Starting the job ...
+Starting the job ...
+Starting the job ...
+...
+...
+...
+INFO: Scanning...
+INFO: Any empty folders will not be processed, because source and/or destination doesn't have full folder support
+
+Job ffbdf82a-0e0d-e644-4afa-2f6f04989ff7 has started
+Log file is located at: /home/hpcuser/.azcopy/ffbdf82a-0e0d-e644-4afa-2f6f04989ff7.log
+
+100.0 %, 0 Done, 0 Failed, 0 Pending, 0 Skipped, 0 Total,
+
+
+Job ffbdf82a-0e0d-e644-4afa-2f6f04989ff7 summary
+Elapsed Time (Minutes): 0.0333
+Number of File Transfers: 0
+Number of Folder Property Transfers: 0
+Total Number of Transfers: 0
+Number of Transfers Completed: 0
+Number of Transfers Failed: 0
+Number of Transfers Skipped: 0
+TotalBytesTransferred: 0
+Final Job Status: Completed
+[    484 ] Writing completion file (/home/jobs/mydevitojob/complete)
+[    484 ] Exiting, status: success)
 
 ```
 
