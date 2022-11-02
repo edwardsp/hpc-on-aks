@@ -249,6 +249,96 @@ helm list | grep -v NAME | cut -f 1 | xargs helm uninstall
 
 
 
+## Using local NVME as scratch
+
+### Installation
+
+This implementation is based on the aks-nvme-ssd-provisioner from Alessando Vozza (https://github.com/ams0/aks-nvme-ssd-provisioner).
+
+We modify the menifests to not need to you a persistant volume claim for each compute node and to mount the disk or raidset under /pv-disks/scratch on the host whcih makes it easier to use with teh kubernetes indexed jobs. 
+
+First we clone the repository and enter the directory:
+```
+git clone https://github.com/ams0/aks-nvme-ssd-provisioner
+pushd aks-nvme-ssd-provisioner
+```
+Then we change the mountpoint and create the docker container and upload it into our container registry:
+```
+sed -i "s/\/pv-disks\/\$UUID/\/pv-disks\/scratch/g" aks-nvme-ssd-provisioner.sh
+sed -i "/^COPY .*$/a RUN chmod +x \/usr\/local\/bin\/aks-nvme-ssd-provisioner.sh" Dockerfile
+docker build -t ${acr_name}.azurecr.io/aks-nvme-ssd-provisioner:v1.0.2 .
+docker push ${acr_name}.azurecr.io/aks-nvme-ssd-provisioner:v1.0.2
+```
+The next step conisists in modifying container registry in the manifest and change the name of the label:
+```
+sed -i "s/ams0/${acr_name}.azurecr.io/g" ./manifests/storage-local-static-provisioner.yaml
+sed -i "s/kubernetes.azure.com\/aks-local-ssd/aks-local-ssd/g" ./manifests/storage-local-static-provisioner.yaml
+```
+Now we are ready to deploy the manifest and leave the directory:
+```
+kubectl apply -f manifests/storage-local-static-provisioner.yaml
+popd
+```
+The manifest creates the following kubernetes resources:
+
+*	clusterrolebinding.rbac.authorization.k8s.io/local-storage-provisioner-pv-binding
+*	clusterrole.rbac.authorization.k8s.io/local-storage-provisioner-node-clusterrole
+*	clusterrolebinding.rbac.authorization.k8s.io/local-storage-provisioner-node-binding
+*	serviceaccount/local-storage-admin
+*	configmap/local-provisioner-config
+*	daemonset.apps/local-volume-provisioner
+*	storageclass.storage.k8s.io/local-storage
+
+To apply the changes to the nodepool hb120v2, we need to run the following command to add the label aks-local-ssd:
+```
+az aks nodepool update -g ${resource_group} --cluster-name ${aks_cluster_name} -n hb120v2 --labels aks-local-ssd=true
+```
+
+### Testing with FIO
+
+The example, `examples/fio-nvme-job.yaml`, runs a simple benchmark to test the performance of the local NVME.  This is based on the Ubuntu 20.04 base container, installs fio and runs a test.  Run as follows:
+
+```
+kubectl apply -f examples/fio-nvme-job.yaml
+```
+
+Here is example output:
+
+```
+write_16G: (g=0): rw=write, bs=(R) 4096KiB-4096KiB, (W) 4096KiB-4096KiB, (T) 4096KiB-4096KiB, ioengine=psync, iodepth=1
+fio-3.16
+Starting 1 process
+
+write_16G: (groupid=0, jobs=1): err= 0: pid=787: Wed Nov  2 12:21:49 2022
+  write: IOPS=259, BW=1038MiB/s (1089MB/s)(16.0GiB/15780msec); 0 zone resets
+    clat (usec): min=3184, max=52027, avg=3822.21, stdev=1200.04
+     lat (usec): min=3202, max=52056, avg=3851.71, stdev=1200.11
+    clat percentiles (usec):
+     |  1.00th=[ 3425],  5.00th=[ 3425], 10.00th=[ 3458], 20.00th=[ 3458],
+     | 30.00th=[ 3458], 40.00th=[ 3458], 50.00th=[ 3490], 60.00th=[ 3589],
+     | 70.00th=[ 3785], 80.00th=[ 4293], 90.00th=[ 4621], 95.00th=[ 4817],
+     | 99.00th=[ 5669], 99.50th=[ 6456], 99.90th=[ 8225], 99.95th=[ 8455],
+     | 99.99th=[52167]
+   bw (  MiB/s): min=  952, max= 1064, per=99.97%, avg=1037.94, stdev=26.13, samples=31
+   iops        : min=  238, max=  266, avg=259.48, stdev= 6.53, samples=31
+  lat (msec)   : 4=75.10%, 10=24.85%, 100=0.05%
+  cpu          : usr=0.85%, sys=2.71%, ctx=4101, majf=0, minf=10
+  IO depths    : 1=100.0%, 2=0.0%, 4=0.0%, 8=0.0%, 16=0.0%, 32=0.0%, >=64=0.0%
+     submit    : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, >=64=0.0%
+     complete  : 0=0.0%, 4=100.0%, 8=0.0%, 16=0.0%, 32=0.0%, 64=0.0%, >=64=0.0%
+     issued rwts: total=0,4096,0,0 short=0,0,0,0 dropped=0,0,0,0
+     latency   : target=0, window=0, percentile=100.00%, depth=1
+
+Run status group 0 (all jobs):
+  WRITE: bw=1038MiB/s (1089MB/s), 1038MiB/s-1038MiB/s (1089MB/s-1089MB/s), io=16.0GiB (17.2GB), run=15780-15780msec
+
+Disk stats (read/write):
+  nvme0n1: ios=0/133975, merge=0/0, ticks=0/251799, in_queue=18980, util=99.45%
+```
+
+
+
+
 
 
 
@@ -375,48 +465,7 @@ hpcuser@mpi-pod1:~$ mpirun -np 2 -npernode 1 -hostfile ~/hostfile -x LD_LIBRARY_
 
 hpcuser@mpi-pod1:~$
 ```
-## Add a local ssd or nvme drive(s) as local scratch
 
-This implementation is based on the aks-nvme-ssd-provisioner from Alessando Vozza (https://github.com/ams0/aks-nvme-ssd-provisioner).
-
-We modify the menifests to not need to you a persistant volume claim for each compute node and to mount the disk or raidset under /pv-disks/scratch on the host whcih makes it easier to use with teh kubernetes indexed jobs. 
-
-First we clone the repository and enter the directory:
-```
-git clone https://github.com/ams0/aks-nvme-ssd-provisioner
-pushd aks-nvme-ssd-provisioner
-```
-Then we change the mountpoint and create the docker container and upload it into our container registry:
-```
-sed -i "s/\/pv-disks\/\$UUID/\/pv-disks\/scratch/g" aks-nvme-ssd-provisioner.sh
-sed -i "/^COPY .*$/a RUN chmod +x \/usr\/local\/bin\/aks-nvme-ssd-provisioner.sh" Dockerfile
-docker build -t ${acr_name}.azurecr.io/aks-nvme-ssd-provisioner:v1.0.2 .
-docker push ${acr_name}.azurecr.io/aks-nvme-ssd-provisioner:v1.0.2
-```
-The next step conisists in modifying container registry in the manifest and change the name of the label:
-```
-sed -i "s/ams0/${acr_name}.azurecr.io/g" ./manifests/storage-local-static-provisioner.yaml
-sed -i "s/kubernetes.azure.com\/aks-local-ssd/aks-local-ssd/g" ./manifests/storage-local-static-provisioner.yaml
-```
-Now we are ready to deploy the manifest and leave the directory:
-```
-kubectl apply -f manifests/storage-local-static-provisioner.yaml
-popd
-```
-The manifest creates the following kubernetes resources:
-
-*	clusterrolebinding.rbac.authorization.k8s.io/local-storage-provisioner-pv-binding
-*	clusterrole.rbac.authorization.k8s.io/local-storage-provisioner-node-clusterrole
-*	clusterrolebinding.rbac.authorization.k8s.io/local-storage-provisioner-node-binding
-*	serviceaccount/local-storage-admin
-*	configmap/local-provisioner-config
-*	daemonset.apps/local-volume-provisioner
-*	storageclass.storage.k8s.io/local-storage
-
-To apply the changes to the nodepool hb120v2, we need to run the following command to add the label aks-local-ssd:
-```
-az aks nodepool update -g ${resource_group} --cluster-name ${aks_cluster_name} -n hb120v2 --labels aks-local-ssd=true
-```
 ## Run the OpenFoam Helm demo
 
 We assume that the the previous demos have been run. If not, please add the storageclass by running:

@@ -12,7 +12,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: worker
-        image: __ACRNAME__.azurecr.io/ubuntu2004-mofed:latest
+        image: ubuntu:20.04
         securityContext:
           capabilities:
             add: ["IPC_LOCK"]
@@ -26,6 +26,7 @@ spec:
         - "bash"
         - "-c"
         - |
+          apt update
           apt install -y fio
           fio --name=write_16G --directory=/scratch --direct=1 --size=16G --bs=4M --rw=write --numjobs=1
         env:
