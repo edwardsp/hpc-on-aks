@@ -1,0 +1,614 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  completions: {{ .Values.numberOfNodes }}
+  parallelism: {{ .Values.numberOfNodes }}
+  completionMode: Indexed
+  template:
+    metadata:
+      labels:
+        app: devito-job
+        applicationId: {{ .Release.Name }}
+        queue: root.sandbox
+      annotations:
+        #yunikorn.apache.org/schedulingPolicyParameters: "gangSchedulingStyle=Hard placeholderTimeoutInSeconds=3600"
+        yunikorn.apache.org/task-group-name: {{ .Release.Name }}-task-group
+        yunikorn.apache.org/task-groups: |-
+          [{
+              "name": "{{ .Release.Name }}-task-group",
+              "minMember": {{ .Values.numberOfNodes }},
+              "minResource": {
+                "cpu": "96",
+                "memory": "420Gi",
+                "mellanox.com/shared_hca_rdma": "1"
+              },
+              "nodeSelector": {},
+              "tolerations": [],
+              "affinity": {}
+          }]
+    spec:
+      schedulerName: yunikorn
+      restartPolicy: Never
+      containers:
+      - name: worker
+        image: {{ .Values.acrName }}.azurecr.io/ubuntu2004-mofed-hpcx-devito:latest
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK"]
+          privileged: true
+        resources:
+          requests:
+            cpu: 96
+            memory: 420Gi
+            mellanox.com/shared_hca_rdma: 1
+          limits:
+            cpu: 120
+            memory: 447Gi 
+            mellanox.com/shared_hca_rdma: 1
+        command: ["/usr/bin/bash","/opt/actions/hpcx-run"]
+        args:
+        - |
+          cat << EOF >> job_{{ .Release.Name}}.sh
+            #!/bin/bash
+            cp /opt/actions/ccus_modelling4.py ./CCUS_Modelling4.py
+            azcopy make "https://{{ .Values.blobStorageAccountName }}.blob.core.windows.net/{{ .Release.Name }}{{ .Values.sasToken}}"
+            mpirun -np {{ .Values.procsTotal }} --map-by ppr:{{ .Values.procsPerNode }}:node -hostfile /home/{{ .Values.userName }}/hostfile -x DEVITO_LOGGING=WARNING -x DEVITO_MPI=1 --mca coll_hcoll_enable 0 --mca btl ^vader,openib -x LD_LIBRARY_PATH -x UCX_TLS=rc -x PATH python3 CCUS_Modelling4.py
+            azcopy cp "/home/{{ .Values.userName }}/*.jpg" "https://{{ .Values.blobStorageAccountName }}.blob.core.windows.net/{{ .Release.Name }}{{ .Values.sasToken}}"
+          EOF
+          chmod u+x job_{{ .Release.Name}}.sh
+          ./job_{{ .Release.Name}}.sh
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: {{ .Release.Name }}-homedir
+          mountPath: /home
+        - name: scratch
+          mountPath: /scratch
+        - name: actions
+          mountPath: "/opt/actions"         
+      volumes:
+      - name: {{ .Release.Name }}-homedir
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-homedir
+      - name: scratch
+        hostPath:
+          path: /pv-disks/scratch
+          type: Directory
+      - name: actions
+        configMap:
+          name: {{ .Release.Name }}-configmap
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+data:
+  hpcx-run: |
+    #!/bin/bash
+    
+    SECONDS=0
+      
+    # Correct permissions for the /scratch filesystem
+    chmod 1777 /tmp
+        
+    printf "[ %6d ] Starting SSH daemon\n" $SECONDS
+    /etc/init.d/ssh start
+    
+    printf "[ %6d ] Creating IP file (/home/jobs/{{ .Release.Name }}/hosts/${POD_IP})\n" $SECONDS
+    mkdir -p /home/jobs/{{ .Release.Name }}/hosts
+    touch /home/jobs/{{ .Release.Name }}/hosts/${POD_IP}
+    
+    if [ "${JOB_COMPLETION_INDEX}" = "0" ]; then
+      printf "[ %6d ] Adding user with homedir ({{ .Values.userName }})\n" $SECONDS
+      addgroup --gid {{ .Values.groupId }} {{ .Values.groupName }}
+      adduser --disabled-password --uid {{ .Values.userId }} --ingroup {{ .Values.groupName }} --home /home/{{ .Values.userName }} --gecos "" {{ .Values.userName }}
+      printf "[ %6d ] User added ($(getent passwd {{ .Values.userName }} > /dev/null))\n" $SECONDS
+      
+      if [[ ! -d /home/{{ .Values.userName }}/.ssh ]]; then
+        printf "[ %6d ] Creating ssh key\n" $SECONDS
+        cat <<EOF | sudo -u {{ .Values.userName }} bash
+    ssh-keygen -q -f /home/{{ .Values.userName }}/.ssh/id_rsa -N ''
+    echo -e "Host *\n\tStrictHostKeyChecking no" >> /home/{{ .Values.userName }}/.ssh/config
+    chmod 600 /home/{{ .Values.userName }}/.ssh/config
+    cp /home/{{ .Values.userName }}/.ssh/id_rsa.pub /home/{{ .Values.userName }}/.ssh/authorized_keys
+    EOF
+      else
+        echo -e "SSH keys already exist"
+      fi
+      
+      printf "[ %6d ] Waiting for hosts\n" $SECONDS
+      while [ "$(ls /home/jobs/{{ .Release.Name }}/hosts | wc -l)" != "{{ .Values.numberOfNodes }}" ]; do
+        printf "[ %6d ] - hosts available: $(ls /home/jobs/{{ .Release.Name }}/hosts | wc -l) out of {{ .Values.numberOfNodes }}\n" $SECONDS
+        sleep 10
+      done
+      
+      printf "[ %6d ] Creating hostfile\n" $SECONDS
+      ls /home/jobs/{{ .Release.Name }}/hosts > /home/{{ .Values.userName }}/hostfile
+      printf "[ %6d ] Hostfile contents:\n" $SECONDS
+      cat /home/{{ .Values.userName }}/hostfile
+      chown {{ .Values.userName }}:{{ .Values.groupName }} /home/{{ .Values.userName }}/hostfile
+      chmod +r /home/{{ .Values.userName }}/hostfile
+      
+      printf "[ %6d ] Launching MPI\n" $SECONDS
+      cat <<EOF | su - {{ .Values.userName }}
+      module load mpi/hpcx
+      $@
+
+    EOF
+      RESULT=$?
+      
+      echo "here 2"
+
+      printf "[ %6d ] Writing completion file (/home/jobs/{{ .Release.Name }}/complete)\n" $SECONDS
+      if [ "$RESULT" = "0" ]; then
+        echo "success" > /home/jobs/{{ .Release.Name }}/complete
+      else
+        echo "failure ($RESULT)" > /home/jobs/{{ .Release.Name }}/complete
+      fi
+    else
+      printf "[ %6d ] Adding user ({{ .Values.userName }})\n" $SECONDS
+      addgroup --gid {{ .Values.groupId }} {{ .Values.groupName }}
+      adduser --disabled-password --uid {{ .Values.userId }} --ingroup {{ .Values.groupName }} --no-create-home --gecos "" {{ .Values.userName }}
+      printf "[ %6d ] User added ($(getent passwd $user > /dev/null))\n" $SECONDS
+      
+      printf "[ %6d ] Waiting for job completion (/home/jobs/{{ .Release.Name }}/complete)\n" $SECONDS
+      while [ ! -f /home/jobs/{{ .Release.Name }}/complete ]; do
+        sleep 10
+      done
+    fi
+    printf "[ %6d ] Exiting, status: $(</home/jobs/{{ .Release.Name }}/complete))\n" $SECONDS
+
+  ccus_modelling4.py: |
+    ###############################################################################
+    # GSOBrien - devito modelling Poroelastic
+    # based on 2010 Geophysics Paper
+    ###############################################################################
+    # libaries for 3D modelling
+    import numpy as np
+    import segyio
+    import time, sys
+    
+    # from sympy import init_printing, latex
+    ###############################################################################
+    
+    #Devito calls
+    from devito import *
+    from examples.seismic.model import Model
+    #import devitopro *
+    #from devito import configuration
+    #configuration['log-level'] = 'WARNING'
+    #configuration['mpi'] = True
+    #configuration['platform'], configuration['compiler'], configuration['language'], configuration['log-level']
+    from examples.seismic.source import RickerSource, Receiver, TimeAxis
+    #from examples.seismic import plot_image, demo_model
+    
+    # Matplotlib needs to be added after MPI has been taken into account
+    import matplotlib . pyplot as plt
+
+    print('Starting the job ... ');
+
+    ###############################################################################
+    # functions
+    def tic():
+        global startTime_for_tictoc
+        startTime_for_tictoc = time.time()
+    
+    def toc():
+        if 'startTime_for_tictoc' in globals():
+            print("Elapsed time is " + str(time.time() - startTime_for_tictoc) + " s")
+        else:
+            print("Toc: start time not set")
+
+    ###############################################################################
+    # 0 = poro  1=elastic 2 = tti 3 = acoustic
+    solutionR = 0 
+    
+    # Parameters
+    nbl=20;
+    origin = (0,0,0)
+    sp_order = 4;
+    spacing = (12.5,12.5,12.5)
+    model_size = (5600,2400,4000)
+    t0 = 0
+    tn = 1.0
+    dt = 3e-4
+    src_loc=[1300,1200,300]
+    f0 = 15
+    rec_depth = 200
+    nrecX = 21
+    nrecY = 21
+    
+    #/// - Build model - non trivial
+    rhoS=2600.0;   #// Solid's density
+    rhoF=1000.0;   #// Fluid's density
+    Poro=0.05;      #// porosity
+    nu=1.0e-3;       #/#/ viscosity
+    kappa=0.1e-15; #//Permeability
+    Tor=10.0;       #//Tortuosity
+    lamH=4.0e+09;    #//Elastic lambda of the solid matrix
+    muH=7.0e9;     #//Elastic mu of the solid matrix
+    Ks=1.0e10;     #//Solid's bulk modulus
+    Kf=2.4e9;      #//Fluid's bulk modulus
+    
+    Kd = lamH + (2.0/3.0)*muH;  # Kd
+    
+    ###############################################################################
+    ###############################################################################
+    tic();
+    shape = (int(model_size[0]/spacing[0]) ,int(model_size[1]/spacing[1]) ,int(model_size[2]/spacing[2]) )
+    
+    # build model here
+    origin = tuple([0.0 for s in shape])
+    extent = tuple([d * (s - 1) for s, d in zip(shape, spacing)])
+    grid = Grid(extent=extent,shape=shape, origin=origin)
+    space_order=sp_order
+    vp = Function(name='vp', grid=grid, space_order=space_order)
+    lam = Function(name='lam', grid=grid, space_order=space_order)
+    mu = Function(name='mu', grid=grid, space_order=space_order)
+    b = Function(name='b', grid=grid, space_order=space_order)
+    qp = Function(name='qp', grid=grid, space_order=space_order)
+    qs = Function(name='qs', grid=grid, space_order=space_order)
+    phi = Function(name='phi', grid=grid, space_order=space_order)
+    theta = Function(name='theta', grid=grid, space_order=space_order)
+    delta = Function(name='delta', grid=grid, space_order=space_order)
+    myrank = grid.distributor.myrank
+    print('myrank= ',myrank);
+    
+    mu.data[:] = muH;
+    b.data[:] = Poro*rhoF+(1.0-Poro)*rhoS; # rho solid
+    qp.data[:] = rhoF;  # rho F
+    qs.data[:] = (Tor*rhoF)/Poro;  # m
+    phi.data[:] = nu/kappa;  # viscosity  b (devito uses b for rho)
+    theta.data[:] = 1.0-(Kd/Ks);   # alpha
+    delta.data[:] = (Ks / (1.0 - Poro - Kd/Ks + Poro*Ks/Kf ) ); # M
+    vp.data[:] = np.sqrt(Kd/rhoS)
+    #print('here 1');
+    
+    v8 = (Ks / (1.0 - Poro - Kd/Ks + Poro*Ks/Kf ) ); # M
+    v7 = 1.0-(Kd/Ks);   # alpha
+    lam.data[:] = lamH + v7*v7*v8;
+    
+    nx, ny, nz = lam.shape
+    l, mu, ro , rof= lam, mu, b, qp
+    m, b, alp, M = qs, phi, theta, delta
+    model = Model(vp=vp,lam=lam,mu=mu,b=b,qp=qp,qs=qs,phi=phi,theta=theta,delta=delta,space_order=sp_order, dtype=np.float32, nbl=nbl,grid=grid,shape=shape, origin=origin,spacing=spacing,bcs='damp')
+    #print('here 2');
+    
+    # make source functions
+    time_range = TimeAxis(start=t0, stop=tn, step=dt)
+    src = RickerSource(name='src', grid=grid, f0=f0, time_range=time_range)
+    src.coordinates.data[0,0] = src_loc[0]
+    src.coordinates.data[0,1] = src_loc[1]
+    src.coordinates.data[0,2] = src_loc[2]
+    #src.show()
+    #plt.savefig('ccus4_figureS.jpg');
+    
+    slx=int(nx/2);
+    sly=int(ny/2)
+    slz=int(nz/2)
+    #print('3',vp.data.max() )
+    ###############################################################################
+    ###############################################################################
+    
+    x, y, z = grid.dimensions
+    timeD = grid.time_dim
+    t = grid.stepping_dim
+    s = timeD.spacing
+    
+    v = VectorTimeFunction(name='v', grid=grid, space_order=sp_order, time_order=1)
+    q = VectorTimeFunction(name='q', grid=grid, space_order=sp_order, time_order=1)
+    tau = TensorTimeFunction(name='tau', grid=grid, space_order=sp_order, time_order=1)
+    p = TimeFunction(name='p', grid=grid, space_order=sp_order, time_order=1)
+    pac = TimeFunction(name='pac', grid=grid, space_order=sp_order, time_order=2)
+    sH = TimeFunction(name='sH', grid=grid, space_order=sp_order, time_order=1)
+    sV = TimeFunction(name='sV', grid=grid, space_order=sp_order, time_order=1)
+    
+    # Source and Receivers
+    s_xx = src.inject(field=tau.forward[0, 0], expr=s*src)
+    s_yy = src.inject(field=tau.forward[1, 1], expr=s*src)
+    s_zz = src.inject(field=tau.forward[2, 2], expr=s*src)
+    s_xy = src.inject(field=tau.forward[0,1], expr=s*src)
+    s_yx = src.inject(field=tau.forward[1,0], expr=s*src)
+    s_ac = src.inject(field=pac, expr=s*src)
+    s_sH = src.inject(field=sH.forward, expr=s*src)
+    s_sV = src.inject(field=sV.forward, expr=s*src)
+    
+    # Receivers
+    rec1 = Receiver(name="rec1", grid=grid, npoint=nrecX*nrecY, time_range=time_range)
+    rec2 = Receiver(name="rec2", grid=grid, npoint=nrecX*nrecY, time_range=time_range)
+    rec3 = Receiver(name="rec3", grid=grid, npoint=nrecX*nrecY, time_range=time_range)
+    rec4 = Receiver(name="rec4", grid=grid, npoint=nrecX*nrecY, time_range=time_range)
+    rec5 = Receiver(name="rec5", grid=grid, npoint=nrecX*nrecY, time_range=time_range)
+    rec = np.empty((nrecX*nrecY, 3)) 
+    count = 0;
+    for sx in range(0,nrecX):
+        for sy in range(0,nrecY):
+            rec[count,0] = sx*model_size[0]/(nrecX+1) + 0.5*model_size[0]/(nrecX+1);
+            rec[count,1] = sy*model_size[1]/(nrecY+1) + 0.5*model_size[1]/(nrecY+1);
+            rec[count,2] = rec_depth 
+            count = count + 1;
+    rec1.coordinates.data[:, 0] = rec[:,0]
+    rec1.coordinates.data[:, 1] = rec[:,1]
+    rec1.coordinates.data[:, 2] = rec[:,2]
+    rec2.coordinates.data[:, 0] = rec[:,0]
+    rec2.coordinates.data[:, 1] = rec[:,1]
+    rec2.coordinates.data[:, 2] = rec[:,2]
+    rec3.coordinates.data[:, 0] = rec[:,0]
+    rec3.coordinates.data[:, 1] = rec[:,1]
+    rec3.coordinates.data[:, 2] = rec[:,2]
+    rec4.coordinates.data[:, 0] = rec[:,0]
+    rec4.coordinates.data[:, 1] = rec[:,1]
+    rec4.coordinates.data[:, 2] = rec[:,2]
+    rec5.coordinates.data[:, 0] = rec[:,0]
+    rec5.coordinates.data[:, 1] = rec[:,1]
+    rec5.coordinates.data[:, 2] = rec[:,2]
+        
+    rec_term = rec1.interpolate(expr=tau[0, 0] + tau[2,2] + tau[1, 1])
+    rec_term += rec2.interpolate(expr=v[0])
+    rec_term += rec3.interpolate(expr=v[1])
+    rec_term += rec4.interpolate(expr=v[2])
+    rec_term += rec5.interpolate(expr=p)
+    rec_termP = rec5.interpolate(expr=pac)
+    rec_termV = rec2.interpolate(expr=v[0])
+    rec_termV += rec3.interpolate(expr=v[1])
+    rec_termV += rec4.interpolate(expr=v[2])
+    ###############################################################################
+    
+    # Build PDE
+    #model.damp=0;
+    A = m/(m*ro-rof*rof)
+    B = b*rof/(m*ro-rof*rof)
+    C = rof/(m*ro-rof*rof)
+    D=(m*ro-rof*rof)/s + ro*b*0.5
+    E=(m*ro-rof*rof)/s - ro*b*0.5
+    Vbar = (q + q.forward)*0.5
+    
+    toc()
+    
+    if(solutionR == 0):  
+        # PoroElastic Solution
+        print('PoroElastic Kernel')
+        var_q = Eq(q.forward,   (1-model.damp)*(q*E - rof*div(tau) - ro*grad(p) )/D ) 
+        
+        var_v = Eq(v.forward,   (1-model.damp)*(v + s*( A*div(tau) + B*Vbar + C*grad(p) ) ) )
+        
+        var_tau = Eq(tau.forward, (1-model.damp)*( tau + s * ( l * diag(div(v.forward)) + alp*M*diag(div(q.forward)) 
+                                                            + mu * (grad(v.forward) + grad(v.forward).T) ) ) )
+        
+        var_p = Eq(p.forward, (1-model.damp)*(p - s*( alp*M*div(v.forward) + M*div(q.forward) ) ) )
+        
+        op = Operator([var_q] + [var_v] + [var_tau] + [var_p] + s_xy + s_yx + rec_term)
+        # Run code
+        tic()
+        op(dt=dt, time_M=time_range.num-1)
+        toc()
+        print('ended simulation  ') 
+        print('wavefield size ',tau[0].shape) 
+        print('model size ',ro.shape) 
+    
+    elif solutionR ==1 :    
+        # Elastic solution
+        print('Elastic Kernel')
+        var_v = Eq(v.forward,   (1-model.damp)*(v + s*( div(tau) )/ro) ) 
+        var_tau = Eq(tau.forward, (1-model.damp)*( tau + s * ( l * diag(div(v.forward)) + mu * (grad(v.forward) + grad(v.forward).T) ) ) )
+        op = Operator([var_v] + [var_tau] + s_xx + s_yy + s_zz + rec_term)
+        #op = Operator([var_v] + [var_tau] )
+        # Run code
+        tic()
+        op(dt=dt, time_M=time_range.num-1)
+        print('wavefield size ',tau[0].shape) 
+        print('model size ',ro.shape) 
+        toc()
+        
+    elif solutionR == 3:
+        # Acoustic solution
+        print('Acoustic Kernel')
+        cs2 = (l/ro);
+        pde =  (pac.dt2)/cs2 - pac.laplace + 0*(1-model.damp) * pac.dt
+        stencil = Eq(pac.forward, solve(pde, pac.forward))
+        op = Operator([stencil] + s_ac + rec_termP, subs=model.spacing_map)
+        # Run code
+        tic()
+        op(dt=dt, time_M=time_range.num-1)
+        toc()
+        ##########################################################################
+        print('Ended ',myrank)
+        print('wavefield size ',pac.data.shape) 
+        print('model size ',ro.shape) 
+        
+        if(myrank==0):
+            #print(slx,sly,slz) 
+            plt.figure(num=6,figsize=(8, 8))
+            plt.clf();
+            
+            mm = pac.data[0][slx,:,:] 
+            plt.subplot(221)
+            plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+            plt.colorbar();
+            
+            mm = pac.data[0][:,sly,:] 
+            plt.subplot(222)
+            plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+            plt.colorbar();
+        
+            mm = pac.data[0][:,:,slz] 
+            plt.subplot(223)
+            plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+            plt.colorbar();
+            plt.savefig('ccus4_figure8.jpg');
+            
+        ##########################################################################
+    elif solutionR == 2 :    
+        # TTI solution - not working
+        print('TTI Kernel ')
+        
+        from examples.seismic.tti import AnisotropicWaveSolver 
+        from examples.seismic import demo_model, setup_geometry, AcquisitionGeometry
+        # update model parameters
+        dt=dt*1000
+        t0=t0*1000
+        tn=tn*1000
+        f0=f0/1000
+        model = demo_model('constant-tti', spacing=spacing, space_order=sp_order,shape=shape, nbl=nbl)
+        model.vp.data[:] = 3.0;
+        model.epsilon.data[:]= 0.6
+        model.delta.data[:]=0.4
+        model.phi.data[:] = 0.4  
+        model.theta.data[:]=0.9
+        #model.update('vp', np.ones(shape)*3.6) # km/s
+    
+        src_coordinates1 = np.empty((1, 3)) 
+        src_coordinates1[0,0] = src_loc[0]
+        src_coordinates1[0,1] = src_loc[1]
+        src_coordinates1[0,2] = src_loc[2]
+        
+        geometry = AcquisitionGeometry(model,rec,src_coordinates1,t0,tn,src_type='Ricker',f0=f0,tw0=1.5/f0)
+        geometry.resample(dt)
+        solver = AnisotropicWaveSolver(model, geometry,spacing=spacing,space_order=sp_order,dt=dt)
+        # solver.dt = dt
+        # Update source location
+        geometry.src_positions[0, :] = src_coordinates1
+        # update receiver geometry 
+        geometry.rec_positions = rec
+        tic()
+        forward_d, u , w, summary  = solver.forward(dt=dt)
+        
+        print('Ended ',myrank)
+        toc()
+        print('u',u.shape)
+        print('f',forward_d.shape)
+        print('model size',phi.shape)
+    
+        ##########################################################################
+        if(solutionR<2 and myrank==0):
+            vv = 0.5*np.max(forward_d.data);
+            fig = plt.figure(num=11,figsize=(9, 6)) ;
+            plt.clf();
+            plt.pcolormesh(forward_d.data,vmin=-vv,vmax=vv,cmap='seismic');
+            plt.ylabel("Time (s)", fontsize=20)
+            plt.xlabel("Receiver position (m)", fontsize=20)
+            plt.gca().invert_yaxis()
+            plt.savefig('ccus4_figure6.jpg');
+    
+            plt.figure(num=3,figsize=(8, 8))
+            plt.clf();
+        
+            mm = u.data[0][slx,:,:] 
+            plt.subplot(221)
+            plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+            plt.colorbar();
+        
+            mm = u.data[0][:,sly,:] 
+            plt.subplot(222)
+            plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+            plt.colorbar();
+        
+            mm = u.data[0][:,:,slz] 
+            plt.subplot(223)
+            plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+            plt.colorbar();
+            plt.savefig('ccus4_figure7.jpg');
+    
+        ###########################################################################    
+        
+    ###############################################################################
+    ###############################################################################
+    #print('22',v.shape)
+    #print('33',v[0].data.max() )
+    #print('33',v[1].data.max() )
+    #print('33',v[2].data.max() )
+    #print('44',pac.shape) 
+    #print('55',pac.data.max() )
+    
+    if(solutionR<2 and myrank==0):
+        print('Plotting')
+            
+        plt.figure(num=1,figsize=(10, 5))
+        plt.clf();
+        plt.pcolormesh(rec1.data, cmap="seismic")
+        plt.ylabel("Time (s)", fontsize=20)
+        plt.xlabel("Receiver position (m)", fontsize=20)
+        plt.gca().invert_yaxis()
+        plt.savefig('ccus4_figure1.jpg');
+        #print(rec1.data.max() )
+        
+        plt.figure(num=2,figsize=(10, 5))
+        plt.clf();
+        plt.pcolormesh(rec4.data, cmap="seismic")
+        plt.ylabel("Time (s)", fontsize=20)
+        plt.xlabel("Receiver position (m)", fontsize=20)
+        plt.gca().invert_yaxis()
+        plt.savefig('ccus4_figure2.jpg');
+    
+        ###############################################################################
+        
+        mm=[]
+        mm=v[0].data[0][slx,:,:];
+        
+        plt.figure(num=3,figsize=(8, 8))
+        plt.clf();
+        plt.subplot(221)
+        plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+        plt.colorbar();
+        
+        plt.subplot(222)
+        plt.pcolormesh(np.transpose(v[0].data[0][:,sly,:]), cmap="RdGy")
+        plt.colorbar();
+        
+        plt.subplot(223)
+        plt.pcolormesh(np.transpose(v[0].data[0][:,:,slz]), cmap="RdGy")
+        plt.colorbar();
+        plt.savefig('ccus4_figure3.jpg');
+        
+        ###############################################################################
+        plt.figure(num=4,figsize=(8, 8))
+        plt.clf();
+        
+        mm = tau[0,0].data[0][slx,:,:] +tau[1,1].data[0][slx,:,:] + tau[2,2].data[0][slx,:,:]
+        plt.subplot(221)
+        plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+        plt.colorbar();
+        
+        mm = tau[0,0].data[0][:,sly,:] +tau[1,1].data[0][:,sly,:] + tau[2,2].data[0][:,sly,:]
+        plt.subplot(222)
+        plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+        plt.colorbar();
+        
+        mm = tau[0,0].data[0][:,:,slz] +tau[1,1].data[0][:,:,slz] + tau[2,2].data[0][:,:,slz]
+        plt.subplot(223)
+        plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+        plt.colorbar();
+        plt.savefig('ccus4_figure4.jpg');
+    
+        ###############################################################################
+        plt.figure(num=5,figsize=(8, 8))
+        plt.clf();
+        
+        mm = p.data[0][slx,:,:] 
+        plt.subplot(221)
+        plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+        plt.colorbar();
+        
+        mm = p.data[0][:,sly,:] 
+        plt.subplot(222)
+        plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+        plt.colorbar();
+        
+        mm = p.data[0][:,:,slz] 
+        plt.subplot(223)
+        plt.pcolormesh(np.transpose(mm), cmap="RdGy")
+        plt.colorbar();
+        #plt.set_aspect('equal')
+        plt.savefig('ccus4_figure5.jpg');
+        
+    
+    ###############################################################################
+    ###############################################################################
+
+
