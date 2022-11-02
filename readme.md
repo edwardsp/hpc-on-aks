@@ -249,6 +249,7 @@ helm list | grep -v NAME | cut -f 1 | xargs helm uninstall
 ## Run the OpenFoam Helm demo
 
 We assume that the the previous demos have been run. If not, please add the storageclass by running:
+
 ```
 kubectl apply -f azurefile-csi-nfs-storageclass.yaml
 ```
@@ -269,8 +270,8 @@ acrName:
 
 To run the OpenFoam job 
 ```
-# helm install <release-name> <chart>
-helm install myopenfoamjob openfoam-job --set acrName=${acr_name}
+# helm install <release-name> <chart> --set <name>=<value>,<name>=<value>
+helm install myopenfoamjob examples/openfoam-job-yunikorn --set acrName=${acr_name}
 
 ```
 You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with myopenfoamjob-0.  Get the pods with `kubectl get pods`:
