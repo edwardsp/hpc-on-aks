@@ -1,0 +1,43 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: 'indexed-job'
+spec:
+  completions: 1
+  parallelism: 1
+  completionMode: Indexed
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: worker
+        image: __ACRNAME__.azurecr.io/ubuntu2004-mofed:latest
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK"]
+          privileged: true
+        resources:
+          requests:
+            mellanox.com/shared_hca_rdma: 1
+          limits:
+            mellanox.com/shared_hca_rdma: 1
+        command:
+        - "bash"
+        - "-c"
+        - |
+          apt install -y fio
+          fio --name=write_16G --directory=/scratch --direct=1 --size=16G --bs=4M --rw=write --numjobs=1
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: scratch
+          mountPath: /scratch
+      volumes:
+      - name: scratch
+        hostPath:
+          path: /pv-disks/scratch
+          type: Directory
