@@ -1,0 +1,71 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  completions: {{ .Values.numberOfNodes }}
+  parallelism: {{ .Values.numberOfNodes }}
+  completionMode: Indexed
+  template:
+    metadata:
+      labels:
+        app: openfoam-job
+        applicationId: {{ .Release.Name }}
+        queue: root.sandbox
+      annotations:
+        #yunikorn.apache.org/schedulingPolicyParameters: "gangSchedulingStyle=Hard placeholderTimeoutInSeconds=3600"
+        yunikorn.apache.org/task-group-name: {{ .Release.Name }}-task-group
+        yunikorn.apache.org/task-groups: |-
+          [{
+              "name": "{{ .Release.Name }}-task-group",
+              "minMember": {{ .Values.numberOfNodes }},
+              "minResource": {
+                "cpu": "105",
+                "mellanox.com/shared_hca_rdma": "1"
+              },
+              "nodeSelector": {},
+              "tolerations": [],
+              "affinity": {}
+          }]
+    spec:
+      schedulerName: yunikorn
+      restartPolicy: Never
+      containers:
+      - name: worker
+        image: {{ .Values.acrName }}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam:latest
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK"]
+          privileged: true
+        resources:
+          requests:
+            cpu: 105
+            mellanox.com/shared_hca_rdma: 1
+          limits:
+            cpu: 120
+            mellanox.com/shared_hca_rdma: 1
+        command:
+        - "bash"
+        - "/opt/actions/hpcx-run"
+        - |
+          cp /opt/actions/openfoam-demo-action ./openfoam_demo.sh
+          chmod u+x ./openfoam_demo.sh 
+          ./openfoam_demo.sh
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: {{ .Release.Name }}-homedir
+          mountPath: /home
+        - name: actions
+          mountPath: "/opt/actions"         
+      volumes:
+      - name: {{ .Release.Name }}-homedir
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-homedir
+      - name: actions
+        configMap:
+          name: {{ .Release.Name }}-configmap
