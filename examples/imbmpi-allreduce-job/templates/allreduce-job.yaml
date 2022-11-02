@@ -1,0 +1,47 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  completions: {{ .Values.numberOfNodes }}
+  parallelism: {{ .Values.numberOfNodes }}
+  completionMode: Indexed
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        agentpool: hb120v2
+      containers:
+      - name: worker
+        image: {{ .Values.acrName }}.azurecr.io/ubuntu2004-mofed-hpcx:latest
+        securityContext:
+          capabilities:
+            add: ["IPC_LOCK"]
+          privileged: true
+        resources:
+          requests:
+            mellanox.com/shared_hca_rdma: 1
+          limits:
+            mellanox.com/shared_hca_rdma: 1
+        command:
+        - bash
+        - /opt/actions/hpcx-run
+        - mpirun -mca coll_hcol_enable 1 -np {{ mul .Values.numberOfNodes .Values.procsPerNode }} -npernode {{ .Values.procsPerNode }} -hostfile /home/{{ .Values.userName }}/hostfile -x LD_LIBRARY_PATH -x UCX_TLS=rc -report-bindings /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 Allreduce -npmin {{ mul .Values.numberOfNodes .Values.procsPerNode }}
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: {{ .Release.Name }}-homedir
+          mountPath: /home
+        - name: actions
+          mountPath: "/opt/actions"         
+      volumes:
+      - name: {{ .Release.Name }}-homedir
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-homedir
+      - name: actions
+        configMap:
+          name: {{ .Release.Name }}-configmap

@@ -8,7 +8,26 @@ spec:
   parallelism: {{ .Values.numberOfNodes }}
   completionMode: Indexed
   template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        applicationId: {{ .Release.Name }}
+        queue: root.sandbox
+      annotations:
+        yunikorn.apache.org/task-group-name: {{ .Release.Name }}-task-group
+        yunikorn.apache.org/task-groups: |-
+          [{
+              "name": "{{ .Release.Name }}-task-group",
+              "minMember": {{ .Values.numberOfNodes }},
+              "minResource": {
+                "mellanox.com/shared_hca_rdma": 1,
+                "cpu": 112
+              },
+              "nodeSelector": {},
+              "tolerations": []
+          }]
     spec:
+      schedulerName: yunikorn
       restartPolicy: Never
       nodeSelector:
         agentpool: hb120v2
@@ -21,6 +40,7 @@ spec:
           privileged: true
         resources:
           requests:
+            cpu: 112
             mellanox.com/shared_hca_rdma: 1
           limits:
             mellanox.com/shared_hca_rdma: 1
@@ -36,6 +56,8 @@ spec:
         volumeMounts:
         - name: {{ .Release.Name }}-homedir
           mountPath: /home
+        - name: scratch
+          mountPath: /scratch
         - name: actions
           mountPath: "/opt/actions"         
       volumes:
