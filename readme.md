@@ -267,7 +267,7 @@ kubectl apply -f azurefile-csi-nfs-storageclass.yaml
 ```
 To run the OpenFoam demo, please make sure you have installed helm version 3 on your device.
 
-The file `examples/openfoam-job/values.yaml` containes the job parameters which can be adjusted or overridden:
+The file `examples/openfoam-job-yunikorn/values.yaml` containes the job parameters which can be adjusted or overridden:
 
 ```
 # Openfoam Job parameters
@@ -404,4 +404,75 @@ Run status group 0 (all jobs):
 
 Disk stats (read/write):
   nvme0n1: ios=0/133975, merge=0/0, ticks=0/251799, in_queue=18980, util=99.45%
+```
+## Run the Devito using Helm and YuniKorn
+
+The file `examples/dvito-job-yunikorn/values.yaml` containes the job parameters which can be adjusted or overridden:
+
+```
+# Openfoam Job parameters
+userName: hpcuser
+userId: 10000
+groupName: hpcuser
+groupId: 10000
+procsPerNode: 120
+numberOfNodes: 2
+acrName: 
+blobStorageAccountName:
+sasToken:
+```
+Create a output storage account: 
+```
+az login
+# TODO: set the account name and container name below
+account_name=
+
+az storage account create \
+  --name ${account_name} \
+  --resource-group ${resource_group} \
+  --location west_europe \
+  --sku Standard_LRS \
+  --kind StorageV2
+
+start_date=$(date +"%Y-%m-%dT%H:%M:%SZ")
+expiry_date=$(date +"%Y-%m-%dT%H:%M:%SZ" --date "next month")
+```
+Create a SAS token:
+```
+sas_toke=$(az storage account generate-sas \
+   --account-name ${account_name} \
+   --permissions acdlruwap \
+   --service b \ 
+   --resource-types co \
+   --permissions rwld \
+   --start $start_date \
+   --expiry $expiry_date \
+   -o tsv)
+```
+The job will create a blob contaienr with the name of the helm chart to store the results. 
+
+To run the Devito job 
+```
+# helm install <release-name> <chart> --set <name>=<value>,<name>=<value>
+helm install mydevitojob examples/devito-job-yunikorn --set acrName=${acr_name} --set blobStorageAccountName=${account_name} --set sasToken=${sas_token}
+
+```
+You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with myopenfoamjob-0.  Get the pods with `kubectl get pods`:
+```
+NAME                       READY   STATUS    RESTARTS   AGE
+install-mlx-driver-c8wz4   1/1     Running   0          4h45m
+install-mlx-driver-zkxpd   1/1     Running   0          4h45m
+mydevitojob-0-rqznw       1/1     Running   0          5m17s
+mydevitojob-1-qlblr       1/1     Running   0          5m17s
+```
+
+And, view the logs with `kubectl logs mydevitojob-0-rqznw`:
+
+```
+
+```
+
+To cleanup the job, just run the helm unistall command:
+```
+helm uninstall mydevitojob
 ```
