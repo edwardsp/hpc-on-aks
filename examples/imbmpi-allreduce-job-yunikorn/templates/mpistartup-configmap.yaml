@@ -1,73 +1,4 @@
 ---
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: {{ .Release.Name }}
-spec:
-  completions: {{ .Values.numberOfNodes }}
-  parallelism: {{ .Values.numberOfNodes }}
-  completionMode: Indexed
-  template:
-    metadata:
-      labels:
-        app: {{ .Release.Name }}
-        applicationId: {{ .Release.Name }}
-        queue: root.sandbox
-      annotations:
-        yunikorn.apache.org/task-group-name: {{ .Release.Name }}-task-group
-        yunikorn.apache.org/task-groups: |-
-          [{
-              "name": "{{ .Release.Name }}-task-group",
-              "minMember": {{ .Values.numberOfNodes }},
-              "minResource": {
-                "mellanox.com/shared_hca_rdma": 1,
-                "cpu": 112
-              },
-              "nodeSelector": {},
-              "tolerations": []
-          }]
-    spec:
-      schedulerName: yunikorn
-      restartPolicy: Never
-      nodeSelector:
-        agentpool: hb120v2
-      containers:
-      - name: worker
-        image: {{ .Values.acrName }}.azurecr.io/ubuntu2004-mofed-hpcx:latest
-        securityContext:
-          capabilities:
-            add: ["IPC_LOCK"]
-          privileged: true
-        resources:
-          requests:
-            cpu: 112
-            mellanox.com/shared_hca_rdma: 1
-          limits:
-            mellanox.com/shared_hca_rdma: 1
-        command:
-        - bash
-        - /opt/actions/hpcx-run
-        - mpirun -mca coll_hcol_enable 1 -np {{ mul .Values.numberOfNodes .Values.procsPerNode }} -npernode {{ .Values.procsPerNode }} -hostfile /home/{{ .Values.userName }}/hostfile -x LD_LIBRARY_PATH -x UCX_TLS=rc -report-bindings /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 Allreduce -npmin {{ mul .Values.numberOfNodes .Values.procsPerNode }}
-        env:
-        - name: POD_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        volumeMounts:
-        - name: {{ .Release.Name }}-homedir
-          mountPath: /home
-        - name: scratch
-          mountPath: /scratch
-        - name: actions
-          mountPath: "/opt/actions"         
-      volumes:
-      - name: {{ .Release.Name }}-homedir
-        persistentVolumeClaim:
-          claimName: {{ .Release.Name }}-homedir
-      - name: actions
-        configMap:
-          name: {{ .Release.Name }}-configmap
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -83,9 +14,6 @@ data:
       printf "[ %6d ] - still waiting" $SECONDS
       sleep 10
     done
-
-    # Correct permissions for the /scratch filesystem
-    chmod 1777 /tmp
         
     printf "[ %6d ] Starting SSH daemon\n" $SECONDS
     /etc/init.d/ssh start
