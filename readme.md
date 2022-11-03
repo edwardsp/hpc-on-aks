@@ -279,7 +279,7 @@ helm uninstall allreduce
 
 ## Schedulers
 
-Kubernetes allows you to change the scheduler and there are several alternatives available.
+Kubernetes allows you to change the scheduler and examples are provided for some alternatives.  The default scheduler with Kubernetes is not designed for the types of jobs we are running.
 
 ### Breaking the default scheduler
 
@@ -301,6 +301,71 @@ helm list --short | xargs helm uninstall
 ```
 
 > The helm jobs can be filted with `grep`. 
+
+### Volcano scheduler
+
+Website: https://volcano.sh/
+
+This is designed for high-performance batch computing and provides more efficient scheduling and supports many different scheduling algorithms.  It also includes support for launching MPI jobs.  Volcano adds a new resource type called `VolcanoJob`.  This new job launches MPI by creating an additional pod to run `mpirun`.
+
+#### Installation
+
+The following commands will install volcano using Helm:
+
+```
+git clone https://github.com/volcano-sh/volcano.git
+cd volcano
+kubectl create namespace volcano-system
+helm install volcano installer/helm/chart/volcano --namespace volcano-system
+```
+
+#### Running the IMB-MPI1 PingPong example
+
+An example is provided.  First update the Azure Container Registry in the YAML file:
+
+```
+sed "s/__ACRNAME__/${acr_name}/g" \
+  examples/pingpong-mpi-job-volcano.yaml.template \
+  > examples/pingpong-mpi-job-volcano.yaml
+```
+
+Listing the pods will show the `mpimaster` and `mpiworker`s:
+
+```
+lm-mpi-job-mpimaster-0     0/1     Completed     0          34s
+lm-mpi-job-mpiworker-0     1/1     Terminating   0          34s
+lm-mpi-job-mpiworker-1     1/1     Terminating   0          34s
+```
+
+The MPI output can be viewed from the `mpimaster` log:
+
+```
+kubectl logs lm-mpi-job-mpimaster-0
+```
+
+#### Uninstalling
+
+Volcano can be uninstalled by running the following:
+
+```
+helm uninstall --namespace volcano-system volcano
+```
+
+### YuniKorn scheduler
+
+Apache project
+
+#### Installation
+
+```
+helm repo add yunikorn https://apache.github.io/yunikorn-release
+helm repo update
+kubectl create namespace yunikorn
+helm install yunikorn yunikorn/yunikorn --namespace yunikorn --set enableSchedulerPlugin=true
+```
+
+#### Running the IMB-MPI1 Allreduce example
+
 
 
 ## Run the OpenFoam Using Helm and YuniKorn
