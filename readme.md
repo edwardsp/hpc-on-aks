@@ -150,6 +150,14 @@ docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam .
 docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam
 popd
 ```
+#### Devito container - ubuntu2004-mofed-hpcx-devito
+```
+pushd containers/ubuntu2004-mofed-hpcx-devito-docker
+sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
+docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-devito .
+docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-devito
+popd
+```
 
 ## Testing IB with IMB-MPI PingPong
 
@@ -259,7 +267,7 @@ kubectl apply -f azurefile-csi-nfs-storageclass.yaml
 ```
 To run the OpenFoam demo, please make sure you have installed helm version 3 on your device.
 
-The file `examples/openfoam-job/values.yaml` containes the job parameters which can be adjusted or overridden:
+The file `examples/openfoam-job-yunikorn/values.yaml` containes the job parameters which can be adjusted or overridden:
 
 ```
 # Openfoam Job parameters
@@ -396,4 +404,127 @@ Run status group 0 (all jobs):
 
 Disk stats (read/write):
   nvme0n1: ios=0/133975, merge=0/0, ticks=0/251799, in_queue=18980, util=99.45%
+```
+## Run the Devito using Helm and YuniKorn
+
+The file `examples/dvito-job-yunikorn/values.yaml` containes the job parameters which can be adjusted or overridden:
+
+```
+# Openfoam Job parameters
+userName: hpcuser
+userId: 10000
+groupName: hpcuser
+groupId: 10000
+procsPerNode: 120
+numberOfNodes: 2
+acrName: 
+blobStorageAccountName:
+sasToken:
+```
+Create a output storage account: 
+```
+az login
+# TODO: set the account name and container name below
+account_name=
+
+az storage account create \
+  --name ${account_name} \
+  --resource-group ${resource_group} \
+  --location west_europe \
+  --sku Standard_LRS \
+  --kind StorageV2
+
+start_date=$(date +"%Y-%m-%dT%H:%M:%SZ")
+expiry_date=$(date +"%Y-%m-%dT%H:%M:%SZ" --date "next month")
+```
+Create a SAS token:
+```
+sas_toke=$(az storage account generate-sas \
+   --account-name ${account_name} \
+   --permissions acdlruwap \
+   --service b \ 
+   --resource-types co \
+   --permissions rwld \
+   --start $start_date \
+   --expiry $expiry_date \
+   -o tsv)
+```
+The job will create a blob contaienr with the name of the helm chart to store the results. 
+
+To run the Devito job 
+```
+# helm install <release-name> <chart> --set <name>=<value>,<name>=<value>
+helm install mydevitojob examples/devito-job-yunikorn --set acrName=${acr_name} --set blobStorageAccountName=${account_name} --set sasToken=${sas_token}
+
+```
+You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with myopenfoamjob-0.  Get the pods with `kubectl get pods`:
+```
+NAME                                                    READY   STATUS              RESTARTS   AGE
+install-mlx-driver-v4xc8                                1/1     QuotaApproved       0          9h
+install-mlx-driver-vvsqb                                1/1     QuotaApproved       0          9h
+mydevitojob-0-vbpvt                                     0/1     ContainerCreating   0          3s
+mydevitojob-1-4bv9h                                     0/1     ContainerCreating   0          3s
+```
+
+And, view the logs with `kubectl logs mydevitojob-0-vbpvt`:
+
+```
+[      0 ] Starting SSH daemon
+ * Starting OpenBSD Secure Shell server sshd
+   ...done.
+[      0 ] Creating IP file (/home/jobs/mydevitojob/hosts/10.244.17.27)
+[      0 ] Adding user with homedir (hpcuser)
+Adding group `hpcuser' (GID 10000) ...
+Done.
+Adding user `hpcuser' ...
+Adding new user `hpcuser' (10000) with group `hpcuser' ...
+Creating home directory `/home/hpcuser' ...
+Copying files from `/etc/skel' ...
+[      1 ] User added ()
+[      1 ] Creating ssh key
+[      1 ] Waiting for hosts
+[      1 ] Creating hostfile
+[      1 ] Hostfile contents:
+10.244.17.27
+10.244.18.28
+[      1 ] Launching MPI
+Loading mpi/hpcx
+  Loading requirement:
+    /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/modulefiles/hpcx
+
+Successfully created the resource.
+Warning: Permanently added '10.244.18.28' (ECDSA) to the list of known hosts.
+Starting the job ...
+Starting the job ...
+Starting the job ...
+...
+...
+...
+INFO: Scanning...
+INFO: Any empty folders will not be processed, because source and/or destination doesn't have full folder support
+
+Job ffbdf82a-0e0d-e644-4afa-2f6f04989ff7 has started
+Log file is located at: /home/hpcuser/.azcopy/ffbdf82a-0e0d-e644-4afa-2f6f04989ff7.log
+
+100.0 %, 0 Done, 0 Failed, 0 Pending, 0 Skipped, 0 Total,
+
+
+Job ffbdf82a-0e0d-e644-4afa-2f6f04989ff7 summary
+Elapsed Time (Minutes): 0.0333
+Number of File Transfers: 0
+Number of Folder Property Transfers: 0
+Total Number of Transfers: 0
+Number of Transfers Completed: 0
+Number of Transfers Failed: 0
+Number of Transfers Skipped: 0
+TotalBytesTransferred: 0
+Final Job Status: Completed
+[    484 ] Writing completion file (/home/jobs/mydevitojob/complete)
+[    484 ] Exiting, status: success)
+
+```
+
+To cleanup the job, just run the helm unistall command:
+```
+helm uninstall mydevitojob
 ```
