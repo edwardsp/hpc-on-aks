@@ -561,8 +561,10 @@ The job will create a blob container with the name of the helm chart to store th
 To run the Devito job
 ```
 # helm install <release-name> <chart> --set <name>=<value>,<name>=<value>
-helm install mydevitojob examples/devito-job-yunikorn --set acrName=${acr_name} --set blobStorageAccountName=${account_name} --set sasToken=${sas_token}
-
+helm install mydevitojob examples/devito-job-yunikorn \
+  --set acrName=${acr_name} \ 
+  --set blobStorageAccountName=${account_name} \
+  --set sasToken=${sas_token}
 ```
 You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with myopenfoamjob-0.  Get the pods with `kubectl get pods`:
 ```
