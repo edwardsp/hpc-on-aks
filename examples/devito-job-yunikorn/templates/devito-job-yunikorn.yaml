@@ -55,7 +55,7 @@ spec:
             #!/bin/bash
             cp /opt/actions/ccus_modelling4.py ./CCUS_Modelling4.py
             azcopy make "https://{{ .Values.blobStorageAccountName }}.blob.core.windows.net/{{ .Release.Name }}?{{ .Values.sasToken}}"
-            mpirun -np {{ .Values.procsTotal }} --map-by ppr:{{ .Values.procsPerNode }}:node -hostfile /home/{{ .Values.userName }}/hostfile -x DEVITO_LOGGING=WARNING -x DEVITO_MPI=1 --mca coll_hcoll_enable 0 --mca btl ^vader,openib -x LD_LIBRARY_PATH -x UCX_TLS=rc -x PATH python3 CCUS_Modelling4.py
+            mpirun -np {{ mul .Values.numberOfNodes .Values.procsPerNode }} --map-by ppr:{{ .Values.procsPerNode }}:node -hostfile /home/{{ .Values.userName }}/hostfile -x DEVITO_LOGGING=WARNING -x DEVITO_MPI=1 --mca coll_hcoll_enable 1 --mca btl ^vader,openib -x LD_LIBRARY_PATH -x UCX_TLS=rc -x PATH python3 CCUS_Modelling4.py
             azcopy cp "/home/{{ .Values.userName }}/*.jpg" "https://{{ .Values.blobStorageAccountName }}.blob.core.windows.net/{{ .Release.Name }}?{{ .Values.sasToken}}"
           EOF
           chmod u+x job_{{ .Release.Name}}.sh
