@@ -56,8 +56,6 @@ spec:
         volumeMounts:
         - name: {{ .Release.Name }}-homedir
           mountPath: /home
-        - name: scratch
-          mountPath: /scratch
         - name: actions
           mountPath: "/opt/actions"         
       volumes:
