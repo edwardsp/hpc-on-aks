@@ -238,33 +238,73 @@ This is example output:
 
 ## Launching with Helm
 
-NOTE: need storage class here
+Helm can simplify deploying on k8s.  A deployment with helm is called a "chart" and the folder structure is as follows:
 
-```
-helm install allreduce examples/imbmpi-allreduce-job --set procsPerNode=120,numberOfNodes=2,acrName=${acr_name}
-```
+* `chart.yaml`: Metadata about what is deployed
+* `values.yaml`: Values that can be substituted into the k8s yaml files
+* `templates`: directory containing yaml files to be deployed
 
-Breaking the scheduler
-```
-for i in `seq -w 1 20`; do for j in `seq -w 4 4`; do helm install allreduce-${j}n-${i} imbmpi-allreduce-job --set numberOfNodes=${j},acrName=${acr_name}; done; done
-```
+All the yaml files will be preprocessed and values will be substituted in.  Helm will manage deploying or clearing up all the resources for a chart and multiple instances of a chart can be deployed.
 
-Removing all helm jobs
-```
-helm list | grep -v NAME | cut -f 1 | xargs helm uninstall
-```
+### The AzureFile CSI NFS storageclass
 
-
-## Schedulers
-
-
-## Run the OpenFoam Using Helm and YuniKorn
-
-We assume that the the previous demos have been run. If not, please add the storageclass by running:
+The helm examples in this repository use the `azurefile-csi-nfs-storageclass`.  This should be installed with the following command:
 
 ```
 kubectl apply -f azurefile-csi-nfs-storageclass.yaml
 ```
+
+### Running the IMB-MPI1 Allreduce Helm Chart
+
+An example is provided for IMB-MPI1 Allreduce jobs and can be run as follows:
+
+```
+helm install allreduce examples/imbmpi-allreduce-job \
+  --set procsPerNode=120,numberOfNodes=2,acrName=${acr_name}
+```
+
+The helm charts that are deployed can be seen with `helm list`:
+
+```
+NAME            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                           APP VERSIONallreduce       default         1               2022-11-03 11:51:27.455113109 +0000 UTC deployed        imbmpi-allreduce-job-0.1.0      0.1.0
+```
+
+The same `kubectl` commands as before can be used to see the pods that are created and viewing the logs.
+
+We can remove the job and clear up all the resources with `helm uninstall`:
+
+```
+helm uninstall allreduce
+```
+
+## Schedulers
+
+Kubernetes allows you to change the scheduler and there are several alternatives available.
+
+### Breaking the default scheduler
+
+The default scheduler does not gang-schedule pods for a job.  Therefore jobs can deadlock when nodes are constrained.  We can create this situation fairly quickly by setting the nodepool size to 4 and submitting many 4 node jobs, e.g.
+
+```
+for n in $(seq -w 1 20); do 
+  helm install allreduce-${n} examples/imbmpi-allreduce-job \
+    --set numberOfNodes=${n},acrName=${acr_name}
+done
+```
+
+At some point it is likely to enter the state where multiple jobs are starting but none of them can progress as they cannot get all the required resources.
+
+All helm jobs can be uninstalled with the following command:
+
+```
+helm list --short | xargs helm uninstall
+```
+
+> The helm jobs can be filted with `grep`. 
+
+
+## Run the OpenFoam Using Helm and YuniKorn
+
 To run the OpenFoam demo, please make sure you have installed helm version 3 on your device.
 
 The file `examples/openfoam-job-yunikorn/values.yaml` containes the job parameters which can be adjusted or overridden:

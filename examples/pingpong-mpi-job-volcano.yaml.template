@@ -1,0 +1,70 @@
+apiVersion: batch.volcano.sh/v1alpha1
+kind: Job
+metadata:
+  name: lm-mpi-job
+spec:
+  minAvailable: 3
+  schedulerName: volcano
+  plugins:
+    ssh: []
+    svc: []
+  tasks:
+    - replicas: 1
+      name: mpimaster
+      policies:
+        - event: TaskCompleted
+          action: CompleteJob
+      template:
+        spec:
+          containers:
+            - command:
+                - /bin/bash
+                - -c
+                - |
+                  MPI_HOST=$(cat /etc/volcano/mpiworker.host | tr "\n" ",")
+                  mkdir -p /var/run/sshd; /usr/sbin/sshd
+                  echo "HOSTS: $MPI_HOST"
+                  . /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/hpcx-init-ompi.sh
+                  hpcx_load
+                  mpirun --allow-run-as-root -np 2 -npernode 1 -hostfile /etc/volcano/mpiworker.host -x LD_LIBRARY_PATH -x UCX_TLS=rc -report-bindings /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/ompi/tests/imb/IMB-MPI1 PingPong | tee /home/re
+              image: __ACRNAME__.azurecr.io/ubuntu2004-mofed-hpcx-openfoam:latest
+              securityContext:
+                capabilities:
+                  add: ["IPC_LOCK"]
+                privileged: true
+              name: mpimaster
+              ports:
+                - containerPort: 22
+                  name: mpijob-port
+              workingDir: /home
+              resources:
+                requests:
+                  cpu: 1
+          restartPolicy: OnFailure
+    - replicas: 2
+      name: mpiworker
+      template:
+        spec:
+          containers:
+            - command:
+                - /bin/bash
+                - -c
+                - |
+                  mkdir -p /var/run/sshd; /usr/sbin/sshd -D;
+              image: __ACRNAME__.azurecr.io/ubuntu2004-mofed-hpcx-openfoam:latest
+              securityContext:
+                capabilities:
+                  add: ["IPC_LOCK"]
+                privileged: true
+              name: mpiworker
+              ports:
+                - containerPort: 22
+                  name: mpijob-port
+              workingDir: /home
+              resources:
+                requests:
+                  mellanox.com/shared_hca_rdma: 1
+                limits:
+                  mellanox.com/shared_hca_rdma: 1
+          restartPolicy: OnFailure
+---
