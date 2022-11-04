@@ -541,7 +541,7 @@ Disk stats (read/write):
 The file `examples/dvito-job-yunikorn/values.yaml` containes the job parameters which can be adjusted or overridden:
 
 ```
-# Openfoam Job parameters
+# Devito Job parameters
 userName: hpcuser
 userId: 10000
 groupName: hpcuser
@@ -570,7 +570,7 @@ expiry_date=$(date +"%Y-%m-%dT%H:%M:%SZ" --date "next month")
 ```
 Create a SAS token:
 ```
-sas_toke=$(az storage account generate-sas \
+sas_token=$(az storage account generate-sas \
    --account-name ${account_name} \
    --permissions acdlruwap \
    --service b \ 
@@ -580,31 +580,33 @@ sas_toke=$(az storage account generate-sas \
    --expiry $expiry_date \
    -o tsv)
 ```
-The job will create a blob contaienr with the name of the helm chart to store the results. 
+The sas_token shpuld start with a "s". I case you create a toke through the Azure portal, please remove the "&" at the beginning. 
 
-To run the Devito job 
+The job will create a blob container with the name of the helm chart to store the results.
+
+To run the Devito job
 ```
 # helm install <release-name> <chart> --set <name>=<value>,<name>=<value>
-helm install mydevitojob examples/devito-job-yunikorn --set acrName=${acr_name} --set blobStorageAccountName=${account_name} --set sasToken=${sas_token}
-
+helm install mydevitojob examples/devito-job-yunikorn \
+  --set acrName=${acr_name} \ 
+  --set blobStorageAccountName=${account_name} \
+  --set sasToken=${sas_token}
 ```
 You can watch the job output by using the kubectl logs command after you got the first pod's name that starts with myopenfoamjob-0.  Get the pods with `kubectl get pods`:
 ```
-NAME                                                    READY   STATUS              RESTARTS   AGE
-install-mlx-driver-v4xc8                                1/1     QuotaApproved       0          9h
-install-mlx-driver-vvsqb                                1/1     QuotaApproved       0          9h
-mydevitojob-0-vbpvt                                     0/1     ContainerCreating   0          3s
-mydevitojob-1-4bv9h                                     0/1     ContainerCreating   0          3s
+NAME                                                  READY   STATUS          RESTARTS      AGE
+install-mlx-driver-j962m                              1/1     QuotaApproved   5 (42m ago)   44m
+install-mlx-driver-rdn9k                              1/1     QuotaApproved   0             44m
+mydevitojob-0-ns58r                                   1/1     QuotaApproved   0             114s
+mydevitojob-1-rxsgh                                   1/1     QuotaApproved   0             114s
 ```
-
-And, view the logs with `kubectl logs mydevitojob-0-vbpvt`:
-
+And, view the logs with `kubectl logs mydevitojob-0-ns58r`:
 ```
 [      0 ] Starting SSH daemon
  * Starting OpenBSD Secure Shell server sshd
    ...done.
-[      0 ] Creating IP file (/home/jobs/mydevitojob/hosts/10.244.17.27)
-[      0 ] Adding user with homedir (hpcuser)
+[      0 ] Creating IP file (/home/jobs/mydevitojob/hosts/10.244.8.7)
+[      1 ] Adding user with homedir (hpcuser)
 Adding group `hpcuser' (GID 10000) ...
 Done.
 Adding user `hpcuser' ...
@@ -616,45 +618,61 @@ Copying files from `/etc/skel' ...
 [      1 ] Waiting for hosts
 [      1 ] Creating hostfile
 [      1 ] Hostfile contents:
-10.244.17.27
-10.244.18.28
+10.244.8.7
+10.244.9.7
 [      1 ] Launching MPI
 Loading mpi/hpcx
   Loading requirement:
     /opt/hpcx-v2.11-gcc-MLNX_OFED_LINUX-5-ubuntu20.04-cuda11-gdrcopy2-nccl2.11-x86_64/modulefiles/hpcx
 
 Successfully created the resource.
-Warning: Permanently added '10.244.18.28' (ECDSA) to the list of known hosts.
+Warning: Permanently added '10.244.9.7' (ECDSA) to the list of known hosts.
+Starting the job ...
+Starting the job ...
+Starting the job ...
+Starting the job ...
+Starting the job ...
+Starting the job ...
+Starting the job ...
+Starting the job ...
 Starting the job ...
 Starting the job ...
 Starting the job ...
 ...
 ...
 ...
+Elapsed time is 201.81673884391785 s
+ended simulation
+wavefield size  (2, 56, 32, 64)
+model size  (56, 32, 64)
+wavefield size  (2, 56, 32, 64)
+model size  (56, 32, 64)
+model size  (56, 32, 64)
+model size  (56, 32, 64)
 INFO: Scanning...
 INFO: Any empty folders will not be processed, because source and/or destination doesn't have full folder support
 
-Job ffbdf82a-0e0d-e644-4afa-2f6f04989ff7 has started
-Log file is located at: /home/hpcuser/.azcopy/ffbdf82a-0e0d-e644-4afa-2f6f04989ff7.log
-
-100.0 %, 0 Done, 0 Failed, 0 Pending, 0 Skipped, 0 Total,
+Job 18e2c32c-599d-7f47-4fa3-677be52667a3 has started
+Log file is located at: /home/hpcuser/.azcopy/18e2c32c-599d-7f47-4fa3-677be52667a3.log
 
 
-Job ffbdf82a-0e0d-e644-4afa-2f6f04989ff7 summary
-Elapsed Time (Minutes): 0.0333
-Number of File Transfers: 0
+100.0 %, 5 Done, 0 Failed, 0 Pending, 0 Skipped, 5 Total, 2-sec Throughput (Mb/s): 0.7774
+
+
+Job 18e2c32c-599d-7f47-4fa3-677be52667a3 summary
+Elapsed Time (Minutes): 0.0334
+Number of File Transfers: 5
 Number of Folder Property Transfers: 0
-Total Number of Transfers: 0
-Number of Transfers Completed: 0
+Total Number of Transfers: 5
+Number of Transfers Completed: 5
 Number of Transfers Failed: 0
 Number of Transfers Skipped: 0
-TotalBytesTransferred: 0
+TotalBytesTransferred: 194611
 Final Job Status: Completed
-[    484 ] Writing completion file (/home/jobs/mydevitojob/complete)
-[    484 ] Exiting, status: success)
 
+[    305 ] Writing completion file (/home/jobs/mydevitojob/complete)
+[    305 ] Exiting, status: success)
 ```
-
 To cleanup the job, just run the helm unistall command:
 ```
 helm uninstall mydevitojob
