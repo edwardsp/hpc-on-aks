@@ -288,7 +288,7 @@ The default scheduler does not gang-schedule pods for a job.  Therefore jobs can
 ```
 for n in $(seq -w 1 20); do 
   helm install allreduce-${n} examples/imbmpi-allreduce-job \
-    --set numberOfNodes=${n},acrName=${acr_name}
+    --set numberOfNodes=4,acrName=${acr_name}
 done
 ```
 
@@ -349,11 +349,14 @@ Volcano can be uninstalled by running the following:
 
 ```
 helm uninstall --namespace volcano-system volcano
+kubectl delete namespace volcano-system
 ```
 
 ### YuniKorn scheduler
 
-Apache project
+Website: https://yunikorn.apache.org/
+
+YuniKorn is an Apache project.  There is an option to use this as the default scheduler with the `--set enableSchedulerPlugin=true`.
 
 #### Installation
 
@@ -366,6 +369,29 @@ helm install yunikorn yunikorn/yunikorn --namespace yunikorn --set enableSchedul
 
 #### Running the IMB-MPI1 Allreduce example
 
+A helm chart is provided for this.  It can be lauched as follows:
+
+```
+helm install allreduce-yk examples/imbmpi-allreduce-job-yunikorn \
+    --set numberOfNodes=2,acrName=${acr_name}
+```
+
+Multiple jobs can be launched and they will be scheduled correctly without deadlocking:
+
+```
+for n in $(seq -w 1 10); do 
+  helm install allreduce-${n} examples/imbmpi-allreduce-job-yunikorn \
+    --set numberOfNodes=4,acrName=${acr_name}
+done
+```
+
+#### Uninstalling
+
+YuniKorn can be uninstalled by running the following:
+
+```
+helm uninstall --namespace yunikorn yunikorn
+```
 
 
 ## Run the OpenFoam Using Helm and YuniKorn
