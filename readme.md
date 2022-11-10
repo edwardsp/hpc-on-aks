@@ -136,8 +136,7 @@ popd
 #### HPCX MPI layer on top of the previous container image - ubuntu2004-mofed-hpcx
 ```
 pushd containers/ubuntu2004-mofed-hpcx-docker
-sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
-docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx .
+docker build --build-arg ACR_NAME=${acr_name} -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx .
 docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx
 popd
 ```
@@ -145,16 +144,14 @@ popd
 #### OpenFoam v10 container - ubuntu2004-mofed-hpcx-openfoam
 ```
 pushd containers/ubuntu2004-mofed-hpcx-openfoam-docker
-sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
-docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam .
+docker build --build-arg ACR_NAME=${acr_name} -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam .
 docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-openfoam
 popd
 ```
 #### Devito container - ubuntu2004-mofed-hpcx-devito
 ```
 pushd containers/ubuntu2004-mofed-hpcx-devito-docker
-sed "s/__ACRNAME__/${acr_name}/g" Dockerfile.template > Dockerfile
-docker build -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-devito .
+docker build --build-arg ACR_NAME=${acr_name} -t ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-devito .
 docker push ${acr_name}.azurecr.io/ubuntu2004-mofed-hpcx-devito
 popd
 ```
