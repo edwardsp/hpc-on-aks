@@ -5,11 +5,11 @@ ENV OS_VER=20.04
 ENV MOFED_VER=5.6-2.0.9.0
 ENV PLATFORM=x86_64
 
-LABEL org.opencountainers.image.source="https://github.com/edwardsp/hpc-on-aks"
-LABEL org.opencountainers.image.url="https://github.com/edwardsp/hpc-on-aks"
-LABEL org.opencountainers.image.title="${OS_NAME} ${OS_VER} with Mellanox drivers"
-LABEL org.opencountainers.image.description="${OS_NAME} ${OS_VER} with Mellanox drivers version ${MOFED_VER}"
-LABEL org.opencountainers.image.base.name="${OS_NAME}:${OS_VER}"
+LABEL org.opencontainers.image.source="https://github.com/edwardsp/hpc-on-aks"
+LABEL org.opencontainers.image.url="https://github.com/edwardsp/hpc-on-aks"
+LABEL org.opencontainers.image.title="${OS_NAME} ${OS_VER} with Mellanox drivers"
+LABEL org.opencontainers.image.description="${OS_NAME} ${OS_VER} with Mellanox drivers version ${MOFED_VER}"
+LABEL org.opencontainers.image.base.name="${OS_NAME}:${OS_VER}"
 
 RUN apt-get update \
     && DEBIAN_FRONTEND="noninteractive" TZ="Europe/London" apt-get -o apt::install-recommends=false install -y \ 

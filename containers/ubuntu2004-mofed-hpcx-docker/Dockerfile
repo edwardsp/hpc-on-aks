@@ -5,11 +5,11 @@ FROM $ACR_NAME.azurecr.io/ubuntu2004-mofed:latest
 ENV HPCX_VER "2.11"
 ENV CUDA_VER "11"
 
-LABEL org.opencountainers.image.source="https://github.com/edwardsp/hpc-on-aks"
-LABEL org.opencountainers.image.url="https://github.com/edwardsp/hpc-on-aks"
-LABEL org.opencountainers.image.title="${OS_NAME} ${OS_VER} with HPCX ${HPCX_VER}"
-LABEL org.opencountainers.image.description="${OS_NAME} ${OS_VER} with Mellanox drivers v${MOFED_VER} and HPCX v${HPCX_VER}"
-LABEL org.opencountainers.image.base.name="${OS_NAME}${OS_VER}-mofed:latest"
+LABEL org.opencontainers.image.source="https://github.com/edwardsp/hpc-on-aks"
+LABEL org.opencontainers.image.url="https://github.com/edwardsp/hpc-on-aks"
+LABEL org.opencontainers.image.title="${OS_NAME} ${OS_VER} with HPCX ${HPCX_VER}"
+LABEL org.opencontainers.image.description="${OS_NAME} ${OS_VER} with Mellanox drivers v${MOFED_VER} and HPCX v${HPCX_VER}"
+LABEL org.opencontainers.image.base.name="${OS_NAME}${OS_VER}-mofed:latest"
 
 
 WORKDIR /root
