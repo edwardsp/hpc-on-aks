@@ -558,7 +558,7 @@ account_name=
 az storage account create \
   --name ${account_name} \
   --resource-group ${resource_group} \
-  --location west_europe \
+  --location westeurope \
   --sku Standard_LRS \
   --kind StorageV2
 
